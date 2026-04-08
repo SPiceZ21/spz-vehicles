@@ -72,6 +72,18 @@ RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
 
     -- 6. Trigger full performance upgrades
     TriggerClientEvent("SPZ:vehicle:applyUpgrades", src, netId)
+
+    -- 6.1 Set timeout for confirmation
+    SetTimeout(Config.UpgradeConfirmTimeout or 3000, function()
+        local current = SPZ.ActiveVehicles[src]
+        if current and current.netId == netId and not current.upgraded then
+            print(("^1[spz-vehicles] Spawn aborted for %s - Upgrade confirmation timeout^7"):format(src))
+            if DoesEntityExist(current.entity) then
+                DeleteEntity(current.entity)
+            end
+            SPZ.ActiveVehicles[src] = nil
+        end
+    end)
 end)
 
 -- 7. Receive upgrades confirmation
