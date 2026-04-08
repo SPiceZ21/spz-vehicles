@@ -1,0 +1,2 @@
+-- Upgrade Slot Definitions
+UpgradeSlots = {}
