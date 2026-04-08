@@ -114,3 +114,32 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
         TriggerEvent("SPZ:vehicleSpawned", src, active.model, active.entity)
     end
 end)
+
+--- Returns the active vehicle data for a player
+--- @param source number
+--- @return table | nil
+function GetPlayerVehicle(source)
+    return SPZ.ActiveVehicles[source]
+end
+
+exports("GetPlayerVehicle", GetPlayerVehicle)
+
+-- Lifecycle Listeners
+
+-- Handle player disconnect
+AddEventHandler("SPZ:playerDisconnected", function(source)
+    DespawnVehicle(source)
+end)
+
+-- Handle state changes (e.g. going to spectator)
+AddEventHandler("SPZ:stateChanged", function(source, newState)
+    if newState == "QUEUED" or newState == "SPECTATING" then
+        DespawnVehicle(source)
+    end
+end)
+
+-- Confirmation from client that entity is gone
+RegisterNetEvent("SPZ:vehicle:despawned", function()
+    local src = source
+    -- Currently handled by server-side timeout in DespawnVehicle
+end)

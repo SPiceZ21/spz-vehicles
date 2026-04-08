@@ -52,6 +52,14 @@ function IsRegistered(model)
     return GetVehicleData(model) ~= nil
 end
 
+--- Returns metadata for a specific vehicle class
+--- @param class number
+--- @return table | nil
+function GetClassMeta(class)
+    return SPZ.ClassMeta[class]
+end
+
 exports("GetVehicleData", GetVehicleData)
 exports("GetClassVehicles", GetClassVehicles)
 exports("IsRegistered", IsRegistered)
+exports("GetClassMeta", GetClassMeta)

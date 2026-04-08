@@ -53,3 +53,22 @@ function GetPollPool(class, count)
 end
 
 exports("GetPollPool", GetPollPool)
+
+--- Returns all race-eligible vehicles for a specific class
+--- @param class number
+--- @return table
+function GetAllPollOptions(class)
+    local results = {}
+    for _, data in pairs(SPZ.VehicleRegistry) do
+        if data.class == class and data.race then
+            table.insert(results, {
+                model = data.model,
+                label = data.label,
+                class = data.class
+            })
+        end
+    end
+    return results
+end
+
+exports("GetAllPollOptions", GetAllPollOptions)

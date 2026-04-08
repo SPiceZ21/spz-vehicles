@@ -51,3 +51,11 @@ RegisterNetEvent("SPZ:vehicle:enter", function(netId)
         TaskWarpPedIntoVehicle(playerPed, vehicle, -1)
     end
 end)
+
+RegisterNetEvent("SPZ:vehicle:unlock", function(netId)
+    local vehicle = NetToVeh(netId)
+    if DoesEntityExist(vehicle) then
+        SetVehicleDoorsLocked(vehicle, 1)
+        PlayVehicleDoorOpenSound(vehicle, 0)
+    end
+end)

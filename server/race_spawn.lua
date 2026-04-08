@@ -14,6 +14,7 @@ end
 function UnlockRaceVehicle(source)
     local active = SPZ.ActiveVehicles[source]
     if active and active.type == "race" and DoesEntityExist(active.entity) then
+        TriggerClientEvent("SPZ:vehicle:unlock", source, active.netId)
         SetVehicleDoorsLocked(active.entity, 1)
     end
 end

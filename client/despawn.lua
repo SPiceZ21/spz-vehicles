@@ -6,5 +6,6 @@ RegisterNetEvent("SPZ:vehicle:despawn", function()
     
     if DoesEntityExist(vehicle) then
         DeleteEntity(vehicle)
+        TriggerServerEvent("SPZ:vehicle:despawned")
     end
 end)
