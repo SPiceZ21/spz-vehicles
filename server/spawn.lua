@@ -27,7 +27,9 @@ local PendingSpawns = {}
 --- @param source number
 --- @param model string
 --- @param spawnType string "freeroam" | "race"
-function SpawnVehicle(source, model, spawnType)
+--- @param coords table {x,y,z} | nil
+--- @param heading number | nil
+function SpawnVehicle(source, model, spawnType, coords, heading)
     local vehicleData = exports["spz-vehicles"]:GetVehicleData(model)
     if not vehicleData then return end
 
@@ -38,7 +40,7 @@ function SpawnVehicle(source, model, spawnType)
     PendingSpawns[source] = spawnType or "freeroam"
 
     -- 3. Trigger client spawn
-    TriggerClientEvent("SPZ:vehicle:spawn", source, model)
+    TriggerClientEvent("SPZ:vehicle:spawn", source, model, coords, heading)
 end
 
 -- 4. Receive spawn confirmation from client
@@ -105,5 +107,10 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     TriggerClientEvent("SPZ:vehicle:enter", src, active.netId)
 
     -- 11. Final event
-    TriggerEvent("SPZ:vehicleSpawned", src, active.model, active.entity)
+    if active.type == "race" then
+        SetVehicleDoorsLocked(active.entity, 2)
+        TriggerEvent("SPZ:raceVehicleSpawned", src, active.model, active.entity)
+    else
+        TriggerEvent("SPZ:vehicleSpawned", src, active.model, active.entity)
+    end
 end)

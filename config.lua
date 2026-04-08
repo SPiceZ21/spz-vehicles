@@ -7,3 +7,4 @@ Config.Cooldowns = {}
 
 Config.DespawnDelay = 500 -- ms to wait before clearing record
 Config.UpgradeConfirmTimeout = 3000 -- ms to wait for upgrade confirmation
+Config.FreeroamSpawnCooldown = 10 -- seconds between spawns

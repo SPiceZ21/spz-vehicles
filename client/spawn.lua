@@ -1,6 +1,6 @@
 -- Client Spawn Logic
 
-RegisterNetEvent("SPZ:vehicle:spawn", function(model)
+RegisterNetEvent("SPZ:vehicle:spawn", function(model, coords, heading)
     local hash = type(model) == "number" and model or GetHashKey(model)
     
     if not IsModelInCdimage(hash) or not IsModelAVehicle(hash) then
@@ -12,11 +12,18 @@ RegisterNetEvent("SPZ:vehicle:spawn", function(model)
         Wait(0)
     end
 
-    local playerPed = PlayerPedId()
-    local pos = GetEntityCoords(playerPed)
-    local heading = GetEntityHeading(playerPed)
+    local x, y, z, h
+    if coords then
+        x, y, z = coords.x, coords.y, coords.z
+        h = heading or 0.0
+    else
+        local playerPed = PlayerPedId()
+        local pPos = GetEntityCoords(playerPed)
+        x, y, z = pPos.x, pPos.y, pPos.z
+        h = GetEntityHeading(playerPed)
+    end
 
-    local vehicle = CreateVehicle(hash, pos.x, pos.y, pos.z, heading, true, false)
+    local vehicle = CreateVehicle(hash, x, y, z, h, true, false)
     
     -- Network settings
     SetEntityAsMissionEntity(vehicle, true, true)
