@@ -87,18 +87,19 @@ RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
 end)
 
 -- 7. Receive upgrades confirmation
-RegisterNetEvent("SPZ:vehicle:upgradesApplied", function()
+RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     local src = source
     local active = SPZ.ActiveVehicles[src]
     if not active then return end
 
     active.upgraded = true
 
-    -- 8. Load customization (Stub for now)
-    local customization = nil -- exports["spz-vehicles"]:GetSavedCustomization(active.model)
+    -- 8. Load customization
+    local profile = exports["spz-identity"]:GetProfile(src)
+    local preset = profile and exports["spz-vehicles"]:LoadCustomization(profile.id, active.model)
 
     -- 9. Apply customization
-    TriggerClientEvent("SPZ:vehicle:applyCustom", src, customization)
+    TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
 
     -- 10. Place player in seat
     TriggerClientEvent("SPZ:vehicle:enter", src, active.netId)
