@@ -2,7 +2,7 @@
 SPZ = SPZ or {}
 
 function SPZ.CaptureVisuals(vehicle)
-  local p1, p2      = GetVehicleColour(vehicle)
+  local p1, p2      = GetVehicleColours(vehicle)
   local pearl, wheel = GetVehicleExtraColours(vehicle)
   local r1,g1,b1    = GetVehicleCustomPrimaryColour(vehicle)
   local r2,g2,b2    = GetVehicleCustomSecondaryColour(vehicle)
