@@ -96,17 +96,25 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
 
     active.upgraded = true
 
-    -- 8. Load customization
-    local profile = exports["spz-identity"]:GetProfile(src)
-    local preset = profile and exports["spz-vehicles"]:LoadCustomization(profile.id, active.model)
-
-    -- 9. Apply customization
-    TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
+    -- 8. Load customization (protected — DB table may not exist yet)
+    local ok, profile = pcall(function()
+        return exports["spz-identity"]:GetProfile(src)
+    end)
+    
+    if ok and profile then
+        local cOk, preset = pcall(function()
+            return exports["spz-vehicles"]:LoadCustomization(profile.id, active.model)
+        end)
+        if cOk and preset then
+            -- 9. Apply customization
+            TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
+        end
+    end
 
     -- 10. Place player in seat
     TriggerClientEvent("SPZ:vehicle:enter", src, active.netId)
 
-    -- 11. Final event
+    -- 11. Final event (MUST always fire so spz-races spawn monitor can proceed)
     if active.type == "race" then
         SetVehicleDoorsLocked(active.entity, 2)
         TriggerEvent("SPZ:raceVehicleSpawned", src, active.model, active.entity)
