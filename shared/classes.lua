@@ -45,3 +45,8 @@ SPZ.ClassMeta = {
     points_win  = 75,
   },
 }
+function GetClassMeta(id)
+  return SPZ.ClassMeta[id]
+end
+
+exports("GetClassMeta", GetClassMeta)
