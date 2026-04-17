@@ -63,3 +63,30 @@ exports("GetVehicleData", GetVehicleData)
 exports("GetClassVehicles", GetClassVehicles)
 exports("IsRegistered", IsRegistered)
 exports("GetClassMeta", GetClassMeta)
+
+CreateThread(function()
+    -- Wait a bit for spz-physics to initialize and load data
+    Wait(1000)
+    
+    if GetResourceState("spz-physics") ~= "started" then
+        print("^3[SPZ-Vehicles]^0 spz-physics is not running. Using fallback static classes.^0")
+        return
+    end
+
+    local count = 0
+    for modelName, vehicle in pairs(SPZ.VehicleRegistry) do
+        -- Try to fetch PP for the baseline standard model, false = not tuned
+        local ppData = exports["spz-physics"]:GetPP(modelName, false)
+        if ppData and ppData.pp then
+            vehicle.pp = ppData.pp
+            if ppData.class then
+                vehicle.class = ppData.class
+            end
+            count = count + 1
+        else
+            -- Calculate a fallback class or keep existing from vehicles.lua
+            vehicle.pp = 0
+        end
+    end
+    print(("^2[SPZ-Vehicles]^0 Loaded physics PP for %s vehicles.^0"):format(count))
+end)
