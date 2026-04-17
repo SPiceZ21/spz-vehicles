@@ -73,3 +73,8 @@ end
 
 exports("FreeroamSpawn", FreeroamSpawn)
 exports("GetFreeroamVehicles", GetFreeroamVehicles)
+
+RegisterNetEvent("SPZ:freeroamSpawn", function(model)
+    local src = source
+    FreeroamSpawn(src, model)
+end)
