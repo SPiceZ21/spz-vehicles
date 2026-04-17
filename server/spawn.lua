@@ -58,6 +58,13 @@ RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
         end
     end
 
+    if not vehicleData then
+        print(("^1[spz-vehicles] SPZ:vehicle:spawned - unknown model hash %s for src %s, aborting^7"):format(modelHash, src))
+        DeleteEntity(vehicle)
+        PendingSpawns[src] = nil
+        return
+    end
+
     -- 5. Store in active vehicles
     local spawnType = PendingSpawns[src] or "freeroam"
     PendingSpawns[src] = nil
