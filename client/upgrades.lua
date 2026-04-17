@@ -1,14 +1,21 @@
 -- Client Upgrades Logic
 
 RegisterNetEvent("SPZ:vehicle:applyUpgrades", function(netId)
-    local vehicle = NetToVeh(netId)
-    local timeout = 50
-    while not DoesEntityExist(vehicle) and timeout > 0 do
+    -- Re-fetch handle each iteration — NetToVeh may return 0 until the entity
+    -- is mapped on this client, which can take a few frames after spawn
+    local vehicle = 0
+    local timeout = 100
+    while timeout > 0 do
+        vehicle = NetToVeh(netId)
+        if DoesEntityExist(vehicle) then break end
         Wait(50)
         timeout = timeout - 1
     end
 
-    if not DoesEntityExist(vehicle) then return end
+    if not DoesEntityExist(vehicle) then
+        print(("[spz-vehicles] applyUpgrades: entity for netId %s never resolved, aborting"):format(netId))
+        return
+    end
 
     SetVehicleModKit(vehicle, 0)
 

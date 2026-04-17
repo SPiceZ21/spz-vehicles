@@ -24,12 +24,21 @@ RegisterNetEvent("SPZ:vehicle:spawn", function(model, coords, heading)
     end
 
     local vehicle = CreateVehicle(hash, x, y, z, h, true, false)
-    
+
     -- Network settings
     SetEntityAsMissionEntity(vehicle, true, true)
     local netId = NetworkGetNetworkIdFromEntity(vehicle)
     SetNetworkIdCanMigrate(netId, true)
     SetNetworkIdExistsOnAllMachines(netId, true)
+
+    -- Wait until the server-side entity replication is confirmed before notifying
+    -- the server — without this, NetworkGetEntityFromNetworkId on the server
+    -- returns 0 and the spawn chain aborts immediately
+    local waitTicks = 0
+    while not NetworkDoesEntityExistWithNetworkId(netId) and waitTicks < 100 do
+        Wait(50)
+        waitTicks = waitTicks + 1
+    end
 
     TriggerServerEvent("SPZ:vehicle:spawned", netId)
     
