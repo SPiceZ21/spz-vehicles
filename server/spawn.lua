@@ -5,17 +5,24 @@ SPZ = SPZ or {}
 -- [source] = { entity, netId, model, class, type, spawnedAt, upgraded }
 SPZ.ActiveVehicles = {}
 
---- Despawns the active vehicle for a specific player
+--- Despawns the active vehicle for a specific player.
+--- Snapshots the netId so the deferred nil-out only clears the OLD vehicle —
+--- if a new spawn is registered in the meantime, it is left untouched.
 --- @param source number
 function DespawnVehicle(source)
     local active = SPZ.ActiveVehicles[source]
     if not active then return end
 
+    local oldNetId = active.netId   -- capture identity of vehicle being removed
     TriggerClientEvent("SPZ:vehicle:despawn", source)
-    
+
     SetTimeout(Config.DespawnDelay or 500, function()
-        SPZ.ActiveVehicles[source] = nil
-        TriggerEvent("SPZ:vehicleDespawned", source)
+        local current = SPZ.ActiveVehicles[source]
+        -- Only clear if the slot still holds the OLD vehicle (not a new spawn)
+        if current and current.netId == oldNetId then
+            SPZ.ActiveVehicles[source] = nil
+            TriggerEvent("SPZ:vehicleDespawned", source)
+        end
     end)
 end
 
@@ -46,52 +53,74 @@ end
 -- 4. Receive spawn confirmation from client
 RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
     local src = source
-    local vehicle = NetworkGetEntityFromNetworkId(netId)
-    if not DoesEntityExist(vehicle) then return end
 
-    local modelHash = GetEntityModel(vehicle)
-    local vehicleData = nil
-    for name, data in pairs(SPZ.VehicleRegistry) do
-        if GetHashKey(name) == modelHash then
-            vehicleData = data
-            break
-        end
-    end
+    -- Entity replication from client→server takes several frames.
+    -- Retry until the entity exists on the server side (up to ~3 s).
+    local MAX_RETRIES  = 10
+    local RETRY_DELAY  = 300   -- ms per attempt
 
-    if not vehicleData then
-        print(("^1[spz-vehicles] SPZ:vehicle:spawned - unknown model hash %s for src %s, aborting^7"):format(modelHash, src))
-        DeleteEntity(vehicle)
-        PendingSpawns[src] = nil
-        return
-    end
-
-    -- 5. Store in active vehicles
-    local spawnType = PendingSpawns[src] or "freeroam"
-    PendingSpawns[src] = nil
-
-    SPZ.ActiveVehicles[src] = {
-        entity    = vehicle,
-        netId     = netId,
-        model     = vehicleData.model,
-        class     = vehicleData.class,
-        type      = spawnType,
-        spawnedAt = os.time(),
-        upgraded  = false,
-    }
-
-    -- 6. Trigger full performance upgrades
-    TriggerClientEvent("SPZ:vehicle:applyUpgrades", src, netId)
-
-    -- 6.1 Set timeout for confirmation
-    SetTimeout(Config.UpgradeConfirmTimeout or 3000, function()
-        local current = SPZ.ActiveVehicles[src]
-        if current and current.netId == netId and not current.upgraded then
-            print(("^1[spz-vehicles] Spawn aborted for %s - Upgrade confirmation timeout^7"):format(src))
-            if DoesEntityExist(current.entity) then
-                DeleteEntity(current.entity)
+    Citizen.CreateThread(function()
+        local vehicle = 0
+        for attempt = 1, MAX_RETRIES do
+            vehicle = NetworkGetEntityFromNetworkId(netId)
+            if DoesEntityExist(vehicle) then break end
+            if attempt < MAX_RETRIES then
+                Citizen.Wait(RETRY_DELAY)
+            else
+                vehicle = 0
             end
-            SPZ.ActiveVehicles[src] = nil
         end
+
+        if not DoesEntityExist(vehicle) then
+            print(("^1[spz-vehicles] SPZ:vehicle:spawned - entity for netId %s never replicated (src %s), aborting^7"):format(netId, src))
+            PendingSpawns[src] = nil
+            return
+        end
+
+        local modelHash = GetEntityModel(vehicle)
+        local vehicleData = nil
+        for name, data in pairs(SPZ.VehicleRegistry) do
+            if GetHashKey(name) == modelHash then
+                vehicleData = data
+                break
+            end
+        end
+
+        if not vehicleData then
+            print(("^1[spz-vehicles] SPZ:vehicle:spawned - unknown model hash %s for src %s, aborting^7"):format(modelHash, src))
+            DeleteEntity(vehicle)
+            PendingSpawns[src] = nil
+            return
+        end
+
+        -- 5. Store in active vehicles
+        local spawnType = PendingSpawns[src] or "freeroam"
+        PendingSpawns[src] = nil
+
+        SPZ.ActiveVehicles[src] = {
+            entity    = vehicle,
+            netId     = netId,
+            model     = vehicleData.model,
+            class     = vehicleData.class,
+            type      = spawnType,
+            spawnedAt = os.time(),
+            upgraded  = false,
+        }
+
+        -- 6. Trigger full performance upgrades
+        TriggerClientEvent("SPZ:vehicle:applyUpgrades", src, netId)
+
+        -- 6.1 Set timeout for confirmation
+        SetTimeout(Config.UpgradeConfirmTimeout or 3000, function()
+            local current = SPZ.ActiveVehicles[src]
+            if current and current.netId == netId and not current.upgraded then
+                print(("^1[spz-vehicles] Spawn aborted for %s - Upgrade confirmation timeout^7"):format(src))
+                if DoesEntityExist(current.entity) then
+                    DeleteEntity(current.entity)
+                end
+                SPZ.ActiveVehicles[src] = nil
+            end
+        end)
     end)
 end)
 
