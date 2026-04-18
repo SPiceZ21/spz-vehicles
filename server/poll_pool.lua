@@ -72,3 +72,19 @@ function GetAllPollOptions(class)
 end
 
 exports("GetAllPollOptions", GetAllPollOptions)
+
+--- Returns a list of class IDs that have at least one race-eligible vehicle
+--- @return table  e.g. {0, 1, 2, 3}
+function GetRaceClasses()
+    local seen = {}
+    local classes = {}
+    for _, data in pairs(SPZ.VehicleRegistry) do
+        if data.race and data.class and not seen[data.class] then
+            seen[data.class] = true
+            table.insert(classes, data.class)
+        end
+    end
+    return classes
+end
+
+exports("GetRaceClasses", GetRaceClasses)
