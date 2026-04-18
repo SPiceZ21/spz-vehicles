@@ -59,10 +59,27 @@ function GetClassMeta(class)
     return SPZ.ClassMeta[class]
 end
 
+--- Returns all distinct class IDs that have at least one race-eligible vehicle
+--- Used by spz-races poll system to discover available classes without
+--- needing direct access to SPZ.VehicleRegistry.
+--- @return table  Array of class IDs (e.g. {0, 1, 2, 3})
+function GetRaceClasses()
+    local seen = {}
+    local classes = {}
+    for _, data in pairs(SPZ.VehicleRegistry) do
+        if data.race and data.class and not seen[data.class] then
+            seen[data.class] = true
+            table.insert(classes, data.class)
+        end
+    end
+    return classes
+end
+
 exports("GetVehicleData", GetVehicleData)
 exports("GetClassVehicles", GetClassVehicles)
 exports("IsRegistered", IsRegistered)
 exports("GetClassMeta", GetClassMeta)
+exports("GetRaceClasses", GetRaceClasses)
 
 CreateThread(function()
     -- Wait a bit for spz-physics to initialize and load data
