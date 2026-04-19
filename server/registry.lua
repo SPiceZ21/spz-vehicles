@@ -1,18 +1,23 @@
 -- Vehicle Registry Logic
 
+-- Build hash→model reverse lookup once at resource start (O(1) lookups thereafter)
+local _hashToModel = {}
+AddEventHandler("onResourceStart", function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+    for name in pairs(SPZ.VehicleRegistry) do
+        _hashToModel[GetHashKey(name)] = name
+    end
+end)
+
 --- Returns the full data object for a specific vehicle model
 --- @param model string | number
 --- @return table | nil
 function GetVehicleData(model)
     if not model then return nil end
-    
+
     if type(model) == "number" then
-        for name, data in pairs(SPZ.VehicleRegistry) do
-            if GetHashKey(name) == model then
-                return data
-            end
-        end
-        return nil
+        local name = _hashToModel[model]
+        return name and SPZ.VehicleRegistry[name] or nil
     end
 
     return SPZ.VehicleRegistry[model]
