@@ -27,6 +27,7 @@ function DespawnVehicle(source)
 end
 
 exports("DespawnVehicle", DespawnVehicle)
+exports("SpawnVehicle", SpawnVehicle)
 
 local PendingSpawns = {}
 
