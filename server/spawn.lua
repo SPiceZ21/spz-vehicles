@@ -47,12 +47,14 @@ function SpawnVehicle(source, model, spawnType, coords, heading)
     PendingSpawns[source] = spawnType or "freeroam"
 
     -- 3. Trigger client spawn
+    print(string.format("[spz-vehicles] DEBUG: Triggering client spawn for %s, model: %s", source, model))
     TriggerClientEvent("SPZ:vehicle:spawn", source, model, coords, heading)
 end
 
 -- 4. Receive spawn confirmation from client
 RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
     local src = source
+    print(string.format("[spz-vehicles] DEBUG: Received SPZ:vehicle:spawned from %s (netId: %s)", src, netId))
 
     -- Entity replication from client→server takes several frames.
     -- Retry until the entity exists on the server side (up to ~3 s).
@@ -124,13 +126,14 @@ RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
     end)
 end)
 
--- 7. Receive upgrades confirmation
 RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     local src = source
+    print(string.format("[spz-vehicles] DEBUG: Received SPZ:vehicle:upgradesApplied from %s (netId: %s)", src, netId))
     local active = SPZ.ActiveVehicles[src]
     if not active then return end
 
     active.upgraded = true
+    print(string.format("[spz-vehicles] DEBUG: Upgrades applied for player %s (netId %s). Type: %s", src, netId, active.type))
 
     -- 8. Load customization (protected — DB table may not exist yet)
     local ok, profile = pcall(function()
