@@ -27,6 +27,13 @@ RegisterNetEvent("SPZ:vehicle:spawn", function(model, coords, heading)
 
     -- Network settings
     SetEntityAsMissionEntity(vehicle, true, true)
+    
+    local timeout = 0
+    while not NetworkGetEntityIsNetworked(vehicle) and timeout < 100 do
+        Wait(0)
+        timeout = timeout + 1
+    end
+
     local netId = NetworkGetNetworkIdFromEntity(vehicle)
     SetNetworkIdCanMigrate(netId, true)
     SetNetworkIdExistsOnAllMachines(netId, true)
