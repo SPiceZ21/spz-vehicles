@@ -27,7 +27,6 @@ function DespawnVehicle(source)
 end
 
 exports("DespawnVehicle", DespawnVehicle)
-exports("SpawnVehicle", SpawnVehicle)
 
 local PendingSpawns = {}
 
@@ -51,6 +50,8 @@ function SpawnVehicle(source, model, spawnType, coords, heading)
     print(string.format("[spz-vehicles] DEBUG: Triggering client spawn for %s, model: %s", source, model))
     TriggerClientEvent("SPZ:vehicle:spawn", source, model, coords, heading)
 end
+
+exports("SpawnVehicle", SpawnVehicle)
 
 -- 4. Receive spawn confirmation from client
 RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
