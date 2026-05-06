@@ -21,6 +21,11 @@ function DespawnVehicle(source)
         -- Only clear if the slot still holds the OLD vehicle (not a new spawn)
         if current and current.netId == oldNetId then
             SPZ.ActiveVehicles[source] = nil
+            
+            -- Clear player statebags
+            Player(source).state:set("vehicleNetId", nil, true)
+            Player(source).state:set("vehicleModel", nil, true)
+
             TriggerEvent("SPZ:vehicleDespawned", source)
         end
     end)
@@ -162,6 +167,14 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     else
         TriggerEvent("SPZ:vehicleSpawned", src, active.model, active.entity)
     end
+
+    -- 12. Set statebags
+    Entity(active.netId).state:set("ownerId", src, true)
+    Entity(active.netId).state:set("vehicleClass", active.class, true)
+    Entity(active.netId).state:set("modelName", active.model, true)
+
+    Player(src).state:set("vehicleNetId", active.netId, true)
+    Player(src).state:set("vehicleModel", active.model, true)
 end)
 
 --- Returns the active vehicle data for a player
@@ -181,11 +194,11 @@ AddEventHandler("SPZ:playerDisconnected", function(source)
 end)
 
 -- Handle state changes (e.g. going to spectator)
-AddEventHandler("SPZ:stateChanged", function(source, newState)
-    if newState == "QUEUED" or newState == "SPECTATING" then
-        DespawnVehicle(source)
-    end
-end)
+-- No longer needed with statebags, but kept for non-linear state changes if any.
+-- Actually, the guide says remove state machine logic.
+-- So we only despawn if the player enters a state that shouldn't have a vehicle.
+-- But since we don't have a central state machine, we'll listen for specific statebag changes in the future if needed.
+-- For now, let's just remove it as per guide.
 
 -- Confirmation from client that entity is gone
 RegisterNetEvent("SPZ:vehicle:despawned", function()

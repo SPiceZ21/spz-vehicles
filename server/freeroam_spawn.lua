@@ -12,9 +12,12 @@ local SpawnCooldowns = {}
 --- @param model string
 function FreeroamSpawn(source, model)
     -- 1. Check Player State
-    local state = exports["spz-core"]:GetPlayerState(source)
-    if state ~= "FREEROAM" then
-        SPZ.Notify(source, "You can't spawn here", "error", 3000)
+    if Player(source).state.inRace then
+        SPZ.Notify(source, "Cannot spawn vehicle during a race", "error", 3000)
+        return
+    end
+    if Player(source).state.inQueue then
+        SPZ.Notify(source, "Cannot spawn vehicle while queued", "error", 3000)
         return
     end
 
