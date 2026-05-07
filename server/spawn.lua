@@ -41,18 +41,22 @@ local PendingSpawns = {}
 --- @param spawnType string "freeroam" | "race"
 --- @param coords table {x,y,z} | nil
 --- @param heading number | nil
-function SpawnVehicle(source, model, spawnType, coords, heading)
+--- @param isRental boolean | nil
+function SpawnVehicle(source, model, spawnType, coords, heading, isRental)
     local vehicleData = exports["spz-vehicles"]:GetVehicleData(model)
     if not vehicleData then return end
 
     -- 2. Despawn existing
     DespawnVehicle(source)
 
-    -- Track spawn type for the callback
-    PendingSpawns[source] = spawnType or "freeroam"
+    -- Track spawn data for the callback
+    PendingSpawns[source] = {
+        type     = spawnType or "freeroam",
+        isRental = isRental or false
+    }
 
     -- 3. Trigger client spawn
-    print(string.format("[spz-vehicles] DEBUG: Triggering client spawn for %s, model: %s", source, model))
+    print(string.format("[spz-vehicles] DEBUG: Triggering client spawn for %s, model: %s (Rental: %s)", source, model, tostring(isRental)))
     TriggerClientEvent("SPZ:vehicle:spawn", source, model, coords, heading)
 end
 
@@ -103,7 +107,7 @@ RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
         end
 
         -- 5. Store in active vehicles
-        local spawnType = PendingSpawns[src] or "freeroam"
+        local spawnData = PendingSpawns[src] or { type = "freeroam", isRental = false }
         PendingSpawns[src] = nil
 
         SPZ.ActiveVehicles[src] = {
@@ -111,7 +115,8 @@ RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
             netId     = netId,
             model     = vehicleData.model,
             class     = vehicleData.class,
-            type      = spawnType,
+            type      = spawnData.type,
+            isRental  = spawnData.isRental,
             spawnedAt = os.time(),
             upgraded  = false,
         }
@@ -142,18 +147,20 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     active.upgraded = true
     print(string.format("[spz-vehicles] DEBUG: Upgrades applied for player %s (netId %s). Type: %s", src, netId, active.type))
 
-    -- 8. Load customization (protected — DB table may not exist yet)
-    local ok, profile = pcall(function()
-        return exports["spz-identity"]:GetProfile(src)
-    end)
-    
-    if ok and profile then
-        local cOk, preset = pcall(function()
-            return exports["spz-vehicles"]:LoadCustomization(profile.id, active.model)
+    -- 8. Load customization (skip for rentals)
+    if not active.isRental then
+        local ok, profile = pcall(function()
+            return exports["spz-identity"]:GetProfile(src)
         end)
-        if cOk and preset then
-            -- 9. Apply customization
-            TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
+        
+        if ok and profile then
+            local cOk, preset = pcall(function()
+                return exports["spz-vehicles"]:LoadCustomization(profile.id, active.model)
+            end)
+            if cOk and preset then
+                -- 9. Apply customization
+                TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
+            end
         end
     end
 
