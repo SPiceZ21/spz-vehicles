@@ -36,10 +36,16 @@ function FreeroamSpawn(source, model)
 
     -- 4. Check License Gate
     local licenseTier = exports["spz-identity"]:GetLicenseTier(source) or 0
+    local isRental = false
+    
     if data.class > licenseTier then
-        local classLabel = SPZ.ClassMeta[data.class].label or "Higher"
-        SPZ.Notify(source, classLabel .. " license required", "error", 3000)
-        return
+        -- Check if it's the rental
+        if model ~= Config.RentalVehicles[data.class] then
+            local classLabel = (SPZ.ClassMeta[data.class] and SPZ.ClassMeta[data.class].label) or "Higher"
+            SPZ.Notify(source, classLabel .. " license required for this vehicle. Try the rental instead.", "error", 3000)
+            return
+        end
+        isRental = true
     end
 
     -- 5. Check Cooldown
@@ -53,7 +59,7 @@ function FreeroamSpawn(source, model)
 
     -- 6. Trigger Sequence
     SpawnCooldowns[source] = now
-    SpawnVehicle(source, model, "freeroam")
+    SpawnVehicle(source, model, "freeroam", nil, nil, isRental)
 end
 
 --- Returns available freeroam vehicles grouped by class for the player
@@ -67,7 +73,14 @@ function GetFreeroamVehicles(source)
         if i <= licenseTier then
             filtered[i] = exports["spz-vehicles"]:GetClassVehicles(i, { freeroam = true })
         else
-            filtered[i] = {}
+            -- Only the rental is available for higher classes
+            local rentalModel = Config.RentalVehicles[i]
+            local data = exports["spz-vehicles"]:GetVehicleData(rentalModel)
+            if data then
+                filtered[i] = { data }
+            else
+                filtered[i] = {}
+            end
         end
     end
     

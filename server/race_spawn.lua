@@ -4,9 +4,9 @@
 --- @param source number
 --- @param model string
 --- @param coords table {x,y,z}
---- @param heading number
-function SpawnRaceVehicle(source, model, coords, heading)
-    SpawnVehicle(source, model, "race", coords, heading)
+--- @param isRental boolean
+function SpawnRaceVehicle(source, model, coords, heading, isRental)
+    SpawnVehicle(source, model, "race", coords, heading, isRental)
 end
 
 --- Called on race start to unlock doors
