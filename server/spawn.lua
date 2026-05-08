@@ -68,9 +68,9 @@ RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
     print(string.format("[spz-vehicles] DEBUG: Received SPZ:vehicle:spawned from %s (netId: %s)", src, netId))
 
     -- Entity replication from client→server takes several frames.
-    -- Retry until the entity exists on the server side (up to ~3 s).
-    local MAX_RETRIES  = 10
-    local RETRY_DELAY  = 300   -- ms per attempt
+    -- Retry until the entity exists on the server side (up to ~10 s).
+    local MAX_RETRIES  = 20
+    local RETRY_DELAY  = 500   -- ms per attempt
 
     Citizen.CreateThread(function()
         local vehicle = 0
