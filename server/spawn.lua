@@ -49,92 +49,99 @@ function SpawnVehicle(source, model, spawnType, coords, heading, isRental)
     -- 2. Despawn existing
     DespawnVehicle(source)
 
+    local x, y, z, h
+    if coords then
+        x, y, z = coords.x, coords.y, coords.z
+        h = heading or 0.0
+    else
+        local ped = GetPlayerPed(source)
+        local pPos = GetEntityCoords(ped)
+        x, y, z = pPos.x, pPos.y, pPos.z
+        h = GetEntityHeading(ped)
+    end
+
     -- Track spawn data for the callback
     PendingSpawns[source] = {
+        model    = model,
         type     = spawnType or "freeroam",
+        coords   = { x = x, y = y, z = z },
+        heading  = h,
         isRental = isRental or false
     }
 
-    -- 3. Trigger client spawn
-    print(string.format("[spz-vehicles] DEBUG: Triggering client spawn for %s, model: %s (Rental: %s)", source, model, tostring(isRental)))
-    TriggerClientEvent("SPZ:vehicle:spawn", source, model, coords, heading)
+    -- Trigger client pre-load
+    print(string.format("[spz-vehicles] DEBUG: Requesting client pre-load for player %d, model: %s", source, model))
+    TriggerClientEvent("SPZ:vehicle:preloadModel", source, model)
 end
 
 exports("SpawnVehicle", SpawnVehicle)
 
--- 4. Receive spawn confirmation from client
-RegisterNetEvent("SPZ:vehicle:spawned", function(netId)
+-- Receive model pre-load confirmation from client and spawn on server
+RegisterNetEvent("SPZ:vehicle:modelLoaded", function()
     local src = source
-    print(string.format("[spz-vehicles] DEBUG: Received SPZ:vehicle:spawned from %s (netId: %s)", src, netId))
+    local spawnData = PendingSpawns[src]
+    if not spawnData then return end
+    PendingSpawns[src] = nil
 
-    -- Entity replication from client→server takes several frames.
-    -- Retry until the entity exists on the server side (up to ~10 s).
-    local MAX_RETRIES  = 20
-    local RETRY_DELAY  = 500   -- ms per attempt
+    local hash = GetHashKey(spawnData.model)
+    local vehicleData = exports["spz-vehicles"]:GetVehicleData(spawnData.model)
+    if not vehicleData then return end
 
-    Citizen.CreateThread(function()
-        local vehicle = 0
-        for attempt = 1, MAX_RETRIES do
-            vehicle = NetworkGetEntityFromNetworkId(netId)
-            if DoesEntityExist(vehicle) then break end
-            if attempt < MAX_RETRIES then
-                Citizen.Wait(RETRY_DELAY)
-            else
-                vehicle = 0
+    -- Create vehicle server-side
+    local vehicle = CreateVehicle(
+        hash,
+        spawnData.coords.x,
+        spawnData.coords.y,
+        spawnData.coords.z,
+        spawnData.heading,
+        true,
+        true
+    )
+
+    -- Wait briefly for creation tick
+    local waitCount = 0
+    while not DoesEntityExist(vehicle) and waitCount < 10 do
+        Wait(50)
+        waitCount = waitCount + 1
+    end
+
+    if not DoesEntityExist(vehicle) then
+        print(string.format("^1[spz-vehicles] SPZ:vehicle:modelLoaded - failed to create vehicle entity on server (src %s)^7", src))
+        return
+    end
+
+    -- Set routing bucket of the spawned vehicle entity to match player's bucket
+    local playerBucket = GetPlayerRoutingBucket(src)
+    SetEntityRoutingBucket(vehicle, playerBucket)
+
+    local netId = NetworkGetNetworkIdFromEntity(vehicle)
+    print(string.format("[spz-vehicles] DEBUG: Server-spawned vehicle (netId: %d) for player %d in bucket %d", netId, src, playerBucket))
+
+    -- 5. Store in active vehicles
+    SPZ.ActiveVehicles[src] = {
+        entity    = vehicle,
+        netId     = netId,
+        model     = vehicleData.model,
+        class     = vehicleData.class,
+        type      = spawnData.type,
+        isRental  = spawnData.isRental,
+        spawnedAt = os.time(),
+        upgraded  = false,
+    }
+
+    -- 6. Trigger full performance upgrades
+    TriggerClientEvent("SPZ:vehicle:applyUpgrades", src, netId)
+
+    -- 6.1 Set timeout for confirmation
+    SetTimeout(Config.UpgradeConfirmTimeout or 3000, function()
+        local current = SPZ.ActiveVehicles[src]
+        if current and current.netId == netId and not current.upgraded then
+            print(("^1[spz-vehicles] Spawn aborted for %s - Upgrade confirmation timeout^7"):format(src))
+            if DoesEntityExist(current.entity) then
+                DeleteEntity(current.entity)
             end
+            SPZ.ActiveVehicles[src] = nil
         end
-
-        if not DoesEntityExist(vehicle) then
-            print(("^1[spz-vehicles] SPZ:vehicle:spawned - entity for netId %s never replicated (src %s), aborting^7"):format(netId, src))
-            PendingSpawns[src] = nil
-            return
-        end
-
-        local modelHash = GetEntityModel(vehicle)
-        local vehicleData = nil
-        for name, data in pairs(SPZ.VehicleRegistry) do
-            if GetHashKey(name) == modelHash then
-                vehicleData = data
-                break
-            end
-        end
-
-        if not vehicleData then
-            print(("^1[spz-vehicles] SPZ:vehicle:spawned - unknown model hash %s for src %s, aborting^7"):format(modelHash, src))
-            DeleteEntity(vehicle)
-            PendingSpawns[src] = nil
-            return
-        end
-
-        -- 5. Store in active vehicles
-        local spawnData = PendingSpawns[src] or { type = "freeroam", isRental = false }
-        PendingSpawns[src] = nil
-
-        SPZ.ActiveVehicles[src] = {
-            entity    = vehicle,
-            netId     = netId,
-            model     = vehicleData.model,
-            class     = vehicleData.class,
-            type      = spawnData.type,
-            isRental  = spawnData.isRental,
-            spawnedAt = os.time(),
-            upgraded  = false,
-        }
-
-        -- 6. Trigger full performance upgrades
-        TriggerClientEvent("SPZ:vehicle:applyUpgrades", src, netId)
-
-        -- 6.1 Set timeout for confirmation
-        SetTimeout(Config.UpgradeConfirmTimeout or 3000, function()
-            local current = SPZ.ActiveVehicles[src]
-            if current and current.netId == netId and not current.upgraded then
-                print(("^1[spz-vehicles] Spawn aborted for %s - Upgrade confirmation timeout^7"):format(src))
-                if DoesEntityExist(current.entity) then
-                    DeleteEntity(current.entity)
-                end
-                SPZ.ActiveVehicles[src] = nil
-            end
-        end)
     end)
 end)
 
