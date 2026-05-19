@@ -254,7 +254,7 @@ SPZ.VehicleRegistry = {
   },
 
   ["ninef"] = {
-    model       = "9f",
+    model       = "ninef",
     label       = "Obey 9F",
     class       = 1,
     top_speed   = 194,
