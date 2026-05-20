@@ -132,8 +132,9 @@ RegisterNetEvent("SPZ:vehicle:modelLoaded", function()
     -- 6. Trigger full performance upgrades
     TriggerClientEvent("SPZ:vehicle:applyUpgrades", src, netId)
 
-    -- 6.1 Set timeout for confirmation
-    SetTimeout(Config.UpgradeConfirmTimeout or 3000, function()
+    -- 6.1 Set timeout for confirmation — must be >= client entity resolve window (5s)
+    --     and <= world.lua SpawnTimeout (8s) to give client enough time.
+    SetTimeout(Config.UpgradeConfirmTimeout or 7000, function()
         local current = SPZ.ActiveVehicles[src]
         if current and current.netId == netId and not current.upgraded then
             print(("^1[spz-vehicles] Spawn aborted for %s - Upgrade confirmation timeout^7"):format(src))
@@ -174,10 +175,13 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     -- 10. Place player in seat
     TriggerClientEvent("SPZ:vehicle:enter", src, active.netId)
 
-    -- 11. Final event (MUST always fire so spz-races spawn monitor can proceed)
+    -- 11. Final event so spz-races spawn monitor can proceed.
+    --     TriggerEvent is resource-local server-side, so also call the export
+    --     for reliable cross-resource confirmation.
     if active.type == "race" then
         SetVehicleDoorsLocked(active.entity, 2)
         TriggerEvent("SPZ:raceVehicleSpawned", src, active.model, active.entity)
+        pcall(function() exports["spz-races"]:ConfirmRaceSpawn(src) end)
     else
         TriggerEvent("SPZ:vehicleSpawned", src, active.model, active.entity)
     end
