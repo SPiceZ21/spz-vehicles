@@ -1,8 +1,8 @@
 -- Freeroam Spawning Logic
 SPZ = SPZ or {}
 
-SPZ.Notify = SPZ.Notify or function(src, msg, type, time)
-    TriggerClientEvent("spz-lib:Notify", src, msg, type, time)
+SPZ.Notify = SPZ.Notify or function(src, msg, ntype, time)
+    TriggerClientEvent('ox_lib:notify', src, { description = msg, type = ntype, duration = time })
 end
 
 local SpawnCooldowns = {}

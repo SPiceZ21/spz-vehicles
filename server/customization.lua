@@ -1,8 +1,8 @@
 -- Customization DB Logic
 SPZ = SPZ or {}
 
-SPZ.Notify = function(src, msg, type, time)
-    TriggerClientEvent("spz-lib:Notify", src, msg, type, time)
+SPZ.Notify = function(src, msg, ntype, time)
+    TriggerClientEvent('ox_lib:notify', src, { description = msg, type = ntype, duration = time })
 end
 
 RegisterNetEvent("SPZ:vehicle:saveCustom", function(modelHash, preset)
