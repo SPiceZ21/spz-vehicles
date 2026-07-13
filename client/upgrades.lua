@@ -4,7 +4,7 @@ RegisterNetEvent("SPZ:vehicle:applyUpgrades", function(netId)
     -- Re-fetch handle each iteration — NetToVeh may return 0 until the entity
     -- is mapped on this client, which can take a few frames after spawn
     local vehicle = 0
-    local timeout = 100
+    local timeout = 200   -- 10 s — remote clients need time to stream the grid area
     while timeout > 0 do
         vehicle = NetToVeh(netId)
         if DoesEntityExist(vehicle) then break end
