@@ -186,10 +186,10 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
         TriggerEvent("SPZ:vehicleSpawned", src, active.model, active.entity)
     end
 
-    -- 12. Set statebags
-    Entity(active.netId).state:set("ownerId", src, true)
-    Entity(active.netId).state:set("vehicleClass", active.class, true)
-    Entity(active.netId).state:set("modelName", active.model, true)
+    -- 12. Set statebags (Entity() takes an entity HANDLE, not a netId)
+    Entity(active.entity).state:set("ownerId", src, true)
+    Entity(active.entity).state:set("vehicleClass", active.class, true)
+    Entity(active.entity).state:set("modelName", active.model, true)
 
     Player(src).state:set("vehicleNetId", active.netId, true)
     Player(src).state:set("vehicleModel", active.model, true)
