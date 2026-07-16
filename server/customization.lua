@@ -33,7 +33,8 @@ end)
 --- @param model string
 --- @return table | nil
 function LoadCustomization(playerId, model)
-    local result = exports.oxmysql:scalarSync(
+    -- await (not Sync): sync variants block the whole server thread
+    local result = MySQL.scalar.await(
         "SELECT preset FROM vehicle_customizations WHERE player_id = ? AND model = ?",
         { playerId, model }
     )
