@@ -33,7 +33,7 @@
 | Client | `commands.lua`             | Debug and admin vehicle commands                 |
 
 ## Dependencies
-- spz-lib
+- ox_lib
 - spz-core
 - spz-identity
 - oxmysql
