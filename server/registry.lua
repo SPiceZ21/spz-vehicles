@@ -15,12 +15,30 @@ end)
 function GetVehicleData(model)
     if not model then return nil end
 
-    if type(model) == "number" then
-        local name = _hashToModel[model]
-        return name and SPZ.VehicleRegistry[name] or nil
+    local name = (type(model) == "number") and _hashToModel[model] or model
+    if not name and type(model) == "string" then name = model end
+    if not name then return nil end
+
+    if not SPZ.VehicleRegistry[name] then
+        -- Dynamic registration fallback for vanilla & add-on mod vehicles
+        local hash = type(model) == "number" and model or GetHashKey(name)
+        SPZ.VehicleRegistry[name] = {
+            model       = name,
+            label       = name:sub(1,1):upper() .. name:sub(2),
+            class       = 0,
+            top_speed   = 180,
+            handling    = 70,
+            accel       = 70,
+            braking     = 70,
+            poll_weight = 5,
+            freeroam    = true,
+            race        = true,
+            isDynamic   = true,
+        }
+        _hashToModel[hash] = name
     end
 
-    return SPZ.VehicleRegistry[model]
+    return SPZ.VehicleRegistry[name]
 end
 
 --- Returns a list of vehicles belonging to a specific class with optional filtering
