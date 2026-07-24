@@ -223,3 +223,9 @@ RegisterNetEvent("SPZ:vehicle:despawned", function()
     local src = source
     -- Currently handled by server-side timeout in DespawnVehicle
 end)
+
+-- Auto-despawn event triggered when player exits vehicle in freeroam
+RegisterNetEvent("SPZ:vehicle:autoDespawn", function()
+    local src = source
+    DespawnVehicle(src)
+end)
