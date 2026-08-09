@@ -1,42 +1,56 @@
-<div align="center">
-
-<img src="https://github.com/SPiceZ21/spz-core-media-kit/raw/main/Banner/Banner%232.png" alt="SPiceZ-Core Banner" width="100%"/>
-
-<br/>
-
 # spz-vehicles
-> Vehicle registry, spawn, upgrades, customization · `v1.3.2`
 
-## Scripts
+> Vehicle registry, classes, spawning, upgrades, customization · `v2.0.0`
 
-| Side   | File                       | Purpose                                          |
-| ------ | -------------------------- | ------------------------------------------------ |
-| Shared | `shared/classes.lua`       | Vehicle class definitions and constants          |
-| Shared | `upgrades.lua`             | Shared upgrade tier and slot definitions         |
-| Shared | `events.lua`               | Shared event name constants                      |
-| Server | `@oxmysql`                 | oxmysql database library import                  |
-| Server | `config.lua`               | Vehicle resource configuration                   |
-| Server | `data/vehicles.lua`        | Master vehicle data table                        |
-| Server | `server/main.lua`          | Entry point, event and export registration       |
-| Server | `registry.lua`             | Vehicle registry and class lookup                |
-| Server | `spawn.lua`                | Server-side vehicle spawn authority              |
-| Server | `upgrades.lua`             | Upgrade persistence and validation               |
-| Server | `customization.lua`        | Livery and cosmetic customization persistence    |
-| Server | `freeroam_spawn.lua`       | Free-roam vehicle spawn handling                 |
-| Server | `race_spawn.lua`           | Race vehicle spawn and grid placement            |
-| Server | `poll_pool.lua`            | Generate vehicle pool for race vote polls        |
-| Client | `client/main.lua`          | Client entry point, vehicle state management     |
-| Client | `spawn.lua`                | Client-side vehicle spawn flow                   |
-| Client | `despawn.lua`              | Vehicle despawn and cleanup                      |
-| Client | `upgrades.lua`             | Apply upgrades to spawned vehicle                |
-| Client | `customization.lua`        | Apply livery and cosmetic customization          |
-| Client | `commands.lua`             | Debug and admin vehicle commands                 |
+## Overview
+
+`spz-vehicles` is the authority on what a player may drive. It holds the master vehicle
+table and class definitions, spawns cars for free roam and for race grids, validates and
+persists upgrades, and stores per-vehicle cosmetic setups. It also builds the vehicle pool
+that `spz-poll` votes on.
+
+## Structure
+
+| Side | File | Purpose |
+|---|---|---|
+| Shared | `shared/classes.lua` | Class definitions and metadata |
+| Shared | `shared/upgrades.lua` | Upgrade tiers and slots |
+| Shared | `shared/events.lua` | Event name constants |
+| Server | `config.lua` | Resource configuration |
+| Server | `data/vehicles.lua` | Master vehicle table |
+| Server | `server/main.lua` | Entry point, export registration |
+| Server | `server/registry.lua` | Registry and class lookup |
+| Server | `server/spawn.lua` | Spawn authority |
+| Server | `server/upgrades.lua` | Upgrade persistence and validation |
+| Server | `server/customization.lua` | Cosmetic persistence |
+| Server | `server/freeroam_spawn.lua` | Free-roam spawning |
+| Server | `server/race_spawn.lua` | Race grid spawning |
+| Server | `server/poll_pool.lua` | Vote pool generation |
+| Client | `client/main.lua` | Vehicle state tracking |
+| Client | `client/spawn.lua` | Spawn flow |
+| Client | `client/despawn.lua` | Despawn and cleanup |
+| Client | `client/upgrades.lua` | Apply upgrades |
+| Client | `client/customization.lua` | Apply cosmetics |
+| Client | `client/commands.lua` | Player and debug commands |
+
+## Exports
+
+| Group | Exports |
+|---|---|
+| Registry | `GetVehicleRegistry` · `GetVehicleData` · `IsRegistered` · `GetClassMeta` · `GetClassVehicles` · `GetRaceClasses` |
+| Spawning | `SpawnVehicle` · `FreeroamSpawn` · `SpawnRaceVehicle` · `DespawnVehicle` · `GetPlayerVehicle` · `GetFreeroamVehicles` |
+| Poll pool | `GetPollPool` · `GetAllPollOptions` |
+| Customization | `LoadCustomization` · `ResetCustomization` |
+| Unlocks | `UnlockRaceVehicle` |
+
+## Commands
+
+`/savecustom` · `/resetcustom`
 
 ## Dependencies
-- ox_lib
-- spz-core
-- spz-identity
-- oxmysql
 
-## CI
-Built and released via `.github/workflows/release.yml` on push to `main`.
+`ox_lib` · `spz-core` · `spz-identity` · `oxmysql`
+
+---
+
+Part of [SPiceZ-Core](../README.md) · GPL-3.0
