@@ -23,7 +23,6 @@ function DespawnVehicle(source)
             SPZ.ActiveVehicles[source] = nil
             
             -- Clear player statebags
-            Player(source).state:set("vehicleNetId", nil, true)
             Player(source).state:set("vehicleModel", nil, true)
 
             TriggerEvent("SPZ:vehicleDespawned", source)
@@ -115,6 +114,12 @@ RegisterNetEvent("SPZ:vehicle:modelLoaded", function()
     SetEntityRoutingBucket(vehicle, playerBucket)
 
     local netId = NetworkGetNetworkIdFromEntity(vehicle)
+
+    -- Per-entity tag so clients can reliably tell OUR spawned cars apart from
+    -- vMenu / any other vehicle. Entity statebags are never reused across
+    -- different entities, so this can't false-positive after netId reuse.
+    Entity(vehicle).state:set('spzVehicle', true, true)
+
     print(string.format("[spz-vehicles] DEBUG: Server-spawned vehicle (netId: %d) for player %d in bucket %d", netId, src, playerBucket))
 
     -- 5. Store in active vehicles
@@ -191,7 +196,6 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     Entity(active.entity).state:set("vehicleClass", active.class, true)
     Entity(active.entity).state:set("modelName", active.model, true)
 
-    Player(src).state:set("vehicleNetId", active.netId, true)
     Player(src).state:set("vehicleModel", active.model, true)
 end)
 
