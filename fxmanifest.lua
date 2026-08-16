@@ -9,6 +9,7 @@ author 'SPiceZ-Core'
 shared_scripts {
   '@ox_lib/init.lua',
   'shared/classes.lua',
+  'shared/classify.lua',
   'shared/upgrades.lua',
   'shared/events.lua',
 }
@@ -18,6 +19,7 @@ server_scripts {
   'config.lua',
   'data/vehicles.lua',
   'server/main.lua',
+  'server/classify.lua',
   'server/registry.lua',
   'server/spawn.lua',
   'server/upgrades.lua',
@@ -29,6 +31,7 @@ server_scripts {
 
 client_scripts {
   'client/main.lua',
+  'client/classify.lua',
   'client/spawn.lua',
   'client/despawn.lua',
   'client/upgrades.lua',
