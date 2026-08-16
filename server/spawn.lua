@@ -14,7 +14,15 @@ function DespawnVehicle(source)
     if not active then return end
 
     local oldNetId = active.netId   -- capture identity of vehicle being removed
-    TriggerClientEvent("SPZ:vehicle:despawn", source)
+    -- Tell the client EXACTLY which vehicle to delete. Deleting "whatever the
+    -- player is in" nuked vMenu cars spawned after a race.
+    TriggerClientEvent("SPZ:vehicle:despawn", source, oldNetId)
+
+    -- Also remove it server-side (it's a server-owned entity) in case no client
+    -- currently has it in scope.
+    if active.entity and DoesEntityExist(active.entity) then
+        DeleteEntity(active.entity)
+    end
 
     SetTimeout(Config.DespawnDelay or 500, function()
         local current = SPZ.ActiveVehicles[source]

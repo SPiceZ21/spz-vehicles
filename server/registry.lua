@@ -20,20 +20,28 @@ function GetVehicleData(model)
     if not name then return nil end
 
     if not SPZ.VehicleRegistry[name] then
-        -- Dynamic registration fallback for vanilla & add-on mod vehicles
+        -- Dynamic registration fallback for vanilla & add-on mod vehicles.
+        -- Placeholder stats only: server/classify.lua probes the model's REAL
+        -- performance and overwrites class/stats as soon as a client reports in
+        -- (cached, so it happens once per model).
         local hash = type(model) == "number" and model or GetHashKey(name)
+        local okc, cached = pcall(function()
+            return exports[GetCurrentResourceName()]:GetClassification(name)
+        end)
+        cached = okc and cached or nil
         SPZ.VehicleRegistry[name] = {
             model       = name,
             label       = name:sub(1,1):upper() .. name:sub(2),
-            class       = 0,
-            top_speed   = 180,
-            handling    = 70,
-            accel       = 70,
-            braking     = 70,
-            poll_weight = 5,
+            class       = cached and cached.class     or 0,
+            top_speed   = cached and cached.top_speed or 180,
+            handling    = cached and cached.handling  or 70,
+            accel       = cached and cached.accel     or 70,
+            braking     = cached and cached.braking   or 70,
+            poll_weight = SPZ.ClassPollWeight and SPZ.ClassPollWeight(cached and cached.class or 0) or 5,
             freeroam    = true,
             race        = true,
             isDynamic   = true,
+            autoClass   = cached ~= nil,
         }
         _hashToModel[hash] = name
     end
