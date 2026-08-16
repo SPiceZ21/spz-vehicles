@@ -1,48 +1,34 @@
 -- client/main.lua — Vehicle lifecycle, auto-despawn on exit, race vehicle exit prevention
 
-local isRacing = false
 local lastVehicle = 0
 
--- ── Race events: track racing state ───────────────────────────────────────────
+-- Authoritative racing flag. The server sets inRace for the whole warmup→race
+-- window and clears it on finish/DNF/cleanup. Gating on this statebag (instead
+-- of a pile of client events) means the lock can NEVER get stuck true after a
+-- race — which was trapping players out of vehicles in freeroam.
+local function inRace() return LocalPlayer.state.inRace == true end
 
-local function SetRacingState(state)
-    isRacing = state
-    local ped = PlayerPedId()
-    local veh = GetVehiclePedIsIn(ped, false)
-    if veh ~= 0 and DoesEntityExist(veh) then
-        SetVehicleDoorsLocked(veh, state and 4 or 1)
-    end
+-- Is `veh` a vehicle SPZ spawned? Checks a per-entity statebag set at spawn —
+-- vMenu / any other vehicle never carries it, and (unlike a netId compare) it
+-- can't false-positive after the engine reuses a freed netId post-race.
+local function isOwnedVehicle(veh)
+    if veh == 0 or not DoesEntityExist(veh) then return false end
+    return Entity(veh).state.spzVehicle == true
 end
 
-RegisterNetEvent("SPZ:warmupPhase",      function() SetRacingState(true)  end)
-RegisterNetEvent("SPZ:stagingPhase",     function() SetRacingState(true)  end)
-RegisterNetEvent("SPZ:countdown",        function() SetRacingState(true)  end)
-RegisterNetEvent("SPZ:go",               function() SetRacingState(true)  end)
-RegisterNetEvent("SPZ:spawnCheckpoints", function() SetRacingState(true)  end)
-RegisterNetEvent("SPZ:tt:Begin",         function() SetRacingState(true)  end)
-
-RegisterNetEvent("SPZ:raceFinished",     function() SetRacingState(false) end)
-RegisterNetEvent("SPZ:raceEnd",          function() SetRacingState(false) end)
-RegisterNetEvent("SPZ:playerDNF",         function() SetRacingState(false) end)
-RegisterNetEvent("SPZ:tpToSafeZone",     function() SetRacingState(false) end)
-RegisterNetEvent("SPZ:tt:End",           function() SetRacingState(false) end)
-
 -- ── Lock vehicle exit during races ────────────────────────────────────────────
-
 CreateThread(function()
     while true do
-        if isRacing then
+        if inRace() then
             local ped = PlayerPedId()
             local veh = GetVehiclePedIsIn(ped, false)
             if veh ~= 0 then
-                -- Disable INPUT_VEH_EXIT (75) and INPUT_ENTER (23)
+                -- No bailing out mid-race (INPUT_VEH_EXIT). We deliberately do NOT
+                -- disable INPUT_ENTER — you're already seated, and doing so caused
+                -- entry-cancel glitches that bled into freeroam.
                 DisableControlAction(0, 75, true)
-                DisableControlAction(0, 23, true)
-
-                -- Ensure doors remain locked
                 SetVehicleDoorsLocked(veh, 4)
 
-                -- Feedback if player attempts to press exit key (F / controller Y)
                 if IsDisabledControlJustPressed(0, 75) then
                     lib.notify({
                         title = "Race Active",
@@ -59,7 +45,19 @@ CreateThread(function()
     end
 end)
 
--- ── Auto-despawn vehicle when player steps out in freeroam ─────────────────────
+-- When the race ends, unlock whatever car we're sitting in so we're never trapped
+-- (a race car kept for the post-race cooldown, etc.). Bound with a nil bag +
+-- own-player filter so it doesn't depend on the server id being assigned at load.
+AddStateBagChangeHandler("inRace", nil, function(bagName, _, value)
+    if value then return end
+    if bagName ~= ('player:%d'):format(GetPlayerServerId(PlayerId())) then return end
+    local veh = GetVehiclePedIsIn(PlayerPedId(), false)
+    if veh ~= 0 then SetVehicleDoorsLocked(veh, 1) end
+end)
+
+-- ── Auto-despawn the SPZ car when player steps out in freeroam ─────────────────
+-- Only the SPZ-spawned vehicle is auto-removed. vMenu / other vehicles are left
+-- alone so they no longer vanish the instant you get out.
 
 CreateThread(function()
     while true do
@@ -67,12 +65,12 @@ CreateThread(function()
         local ped = PlayerPedId()
         local currentVeh = GetVehiclePedIsIn(ped, false)
 
-        if currentVeh ~= 0 and GetPedInVehicleSeat(currentVeh, -1) == ped then
-            -- Player is driver of a vehicle
+        if currentVeh ~= 0 and GetPedInVehicleSeat(currentVeh, -1) == ped and isOwnedVehicle(currentVeh) then
+            -- Player is driver of OUR spawned vehicle
             lastVehicle = currentVeh
         elseif lastVehicle ~= 0 then
             -- Player was driver, but is no longer in driver seat
-            if not isRacing then
+            if not inRace() then
                 local toDespawn = lastVehicle
                 lastVehicle = 0
 
