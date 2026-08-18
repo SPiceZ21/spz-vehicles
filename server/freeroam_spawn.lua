@@ -2,7 +2,7 @@
 SPZ = SPZ or {}
 
 SPZ.Notify = SPZ.Notify or function(src, msg, ntype, time)
-    TriggerClientEvent('ox_lib:notify', src, { description = msg, type = ntype, duration = time })
+    TriggerClientEvent('ox_lib:notify', src, { description = msg, type = ntype, duration = time, position = "center-left" })
 end
 
 local SpawnCooldowns = {}
