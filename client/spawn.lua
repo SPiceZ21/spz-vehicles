@@ -2,14 +2,28 @@
 
 RegisterNetEvent("SPZ:vehicle:preloadModel", function(model)
     local hash = type(model) == "number" and model or GetHashKey(model)
-    
+
+    -- Streaming/DLC metadata can still be catching up right after connect —
+    -- poll for a few seconds instead of bailing on the very first check.
+    local checkDeadline = GetGameTimer() + (Config.ModelCheckGraceMs or 3000)
+    while (not IsModelInCdimage(hash) or not IsModelAVehicle(hash)) and GetGameTimer() < checkDeadline do
+        Wait(100)
+    end
     if not IsModelInCdimage(hash) or not IsModelAVehicle(hash) then
+        TriggerServerEvent("SPZ:vehicle:preloadFailed", model, "unknown_model")
         return
     end
 
     RequestModel(hash)
-    while not HasModelLoaded(hash) do
+    local loadDeadline = GetGameTimer() + (Config.ModelLoadTimeoutMs or 15000)
+    while not HasModelLoaded(hash) and GetGameTimer() < loadDeadline do
         Wait(0)
+    end
+
+    if not HasModelLoaded(hash) then
+        SetModelAsNoLongerNeeded(hash)
+        TriggerServerEvent("SPZ:vehicle:preloadFailed", model, "load_timeout")
+        return
     end
 
     TriggerServerEvent("SPZ:vehicle:modelLoaded")
