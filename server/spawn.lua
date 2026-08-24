@@ -83,6 +83,30 @@ end
 
 exports("SpawnVehicle", SpawnVehicle)
 
+-- Client gave up on the model (unknown/unstreamed, or load timed out) instead
+-- of hanging silently. One automatic retry on a known-safe fallback model —
+-- without this, a single bad model used to need the full race-wide 30s
+-- spawn-timeout monitor (and a whole-lobby cancellation) to recover from.
+RegisterNetEvent("SPZ:vehicle:preloadFailed", function(model, reason)
+    local src = source
+    local spawnData = PendingSpawns[src]
+    if not spawnData then return end
+    PendingSpawns[src] = nil
+
+    print(string.format("^1[spz-vehicles] Preload failed for %s (model %s): %s^7", src, tostring(model), tostring(reason)))
+
+    local fallback = Config.FallbackVehicleModel or "sultan"
+    if spawnData.isFallbackAttempt or spawnData.model == fallback then
+        print(string.format("^1[spz-vehicles] Fallback spawn also failed for %s — giving up.^7", src))
+        return
+    end
+
+    print(string.format("[spz-vehicles] Retrying spawn for %s with fallback model '%s'", src, fallback))
+    SpawnVehicle(src, fallback, spawnData.type, spawnData.coords, spawnData.heading, spawnData.isRental)
+    local retryData = PendingSpawns[src]
+    if retryData then retryData.isFallbackAttempt = true end
+end)
+
 -- Receive model pre-load confirmation from client and spawn on server
 RegisterNetEvent("SPZ:vehicle:modelLoaded", function()
     local src = source
