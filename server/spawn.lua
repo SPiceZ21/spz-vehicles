@@ -50,8 +50,24 @@ local PendingSpawns = {}
 --- @param heading number | nil
 --- @param isRental boolean | nil
 function SpawnVehicle(source, model, spawnType, coords, heading, isRental)
+    -- Known-unloadable model (see server/validate.lua): substitute before asking
+    -- the client, rather than spending the full pre-load timeout discovering it
+    -- again and stalling the race that is waiting on this spawn.
+    if IsModelUnavailable and IsModelUnavailable(model) then
+        local sub = ResolveFallbackModel and ResolveFallbackModel()
+        print(("^3[spz-vehicles] '%s' is unavailable on clients — spawning '%s' for %s instead^7")
+            :format(tostring(model), tostring(sub), tostring(source)))
+        if not sub or sub == model then return end
+        model = sub
+    end
+
     local vehicleData = exports["spz-vehicles"]:GetVehicleData(model)
-    if not vehicleData then return end
+    if not vehicleData then
+        -- Silent nil here used to mean "no car, no error, race cancels".
+        print(("^1[spz-vehicles] SpawnVehicle: no registry entry for '%s' (player %s) — nothing spawned^7")
+            :format(tostring(model), tostring(source)))
+        return
+    end
 
     -- 2. Despawn existing
     DespawnVehicle(source)
@@ -79,6 +95,20 @@ function SpawnVehicle(source, model, spawnType, coords, heading, isRental)
     -- Trigger client pre-load
     print(string.format("[spz-vehicles] DEBUG: Requesting client pre-load for player %d, model: %s", source, model))
     TriggerClientEvent("SPZ:vehicle:preloadModel", source, model)
+
+    -- The client answers with modelLoaded or preloadFailed. If neither arrives,
+    -- the request is lost (client hitching through the load, resource restarted
+    -- mid-spawn, player dropping) and the race-wide spawn monitor stalls for its
+    -- full 30 s before cancelling on everyone. Say so on the server the moment
+    -- it happens, naming the player and model, so the stall is attributable.
+    local watched = PendingSpawns[source]
+    Citizen.SetTimeout((Config.ModelLoadTimeoutMs or 15000) + 5000, function()
+        if PendingSpawns[source] == watched and watched ~= nil then
+            print(string.format(
+                "^1[spz-vehicles] No pre-load answer from player %s for model '%s' — their spawn will not complete.^7",
+                source, tostring(model)))
+        end
+    end)
 end
 
 exports("SpawnVehicle", SpawnVehicle)
@@ -95,7 +125,18 @@ RegisterNetEvent("SPZ:vehicle:preloadFailed", function(model, reason)
 
     print(string.format("^1[spz-vehicles] Preload failed for %s (model %s): %s^7", src, tostring(model), tostring(reason)))
 
-    local fallback = Config.FallbackVehicleModel or "sultan"
+    -- Remember that this model is broken for this client, so the next poll does
+    -- not offer it and the next spawn does not wait on it again.
+    if reason == "unknown_model" then
+        TriggerEvent("SPZ:vehicle:invalidModels", { model })
+        SPZ.UnavailableModels = SPZ.UnavailableModels or {}
+        SPZ.UnavailableModels[tostring(model):lower()] = true
+    end
+
+    -- A fallback that is itself missing from the registry (or unloadable) fails
+    -- silently and takes the race with it, so resolve one that actually works.
+    local fallback = (ResolveFallbackModel and ResolveFallbackModel())
+        or Config.FallbackVehicleModel or "sultan"
     if spawnData.isFallbackAttempt or spawnData.model == fallback then
         print(string.format("^1[spz-vehicles] Fallback spawn also failed for %s — giving up.^7", src))
         return

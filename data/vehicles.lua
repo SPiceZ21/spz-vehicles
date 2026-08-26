@@ -16,8 +16,8 @@ SPZ.VehicleRegistry = {
     race        = true,
   },
 
-  ["dominatormuscle"] = {
-    model       = "dominatormuscle",
+  ["dominator"] = {
+    model       = "dominator",
     label       = "Vapid Dominator",
     class       = 0,
     top_speed   = 160,
@@ -43,8 +43,8 @@ SPZ.VehicleRegistry = {
     race        = true,
   },
 
-  ["sabreeturbo"] = {
-    model       = "sabreeturbo",
+  ["sabregt"] = {
+    model       = "sabregt",
     label       = "Declasse Sabre Turbo",
     class       = 0,
     top_speed   = 158,
@@ -331,8 +331,8 @@ SPZ.VehicleRegistry = {
     race        = true,
   },
 
-  ["feltzer"] = {
-    model       = "feltzer",
+  ["feltzer2"] = {
+    model       = "feltzer2",
     label       = "Benefactor Feltzer",
     class       = 1,
     top_speed   = 191,
@@ -567,8 +567,8 @@ SPZ.VehicleRegistry = {
     race        = true,
   },
 
-  ["italliavb"] = {
-    model       = "italliavb",
+  ["italirsx"] = {
+    model       = "italirsx",
     label       = "Grotti Itali RSX",
     class       = 2,
     top_speed   = 256,
@@ -751,8 +751,8 @@ SPZ.VehicleRegistry = {
     race        = true,
   },
 
-  ["proto"] = {
-    model       = "proto",
+  ["prototipo"] = {
+    model       = "prototipo",
     label       = "Grotti X80 Proto",
     class       = 3,
     top_speed   = 326,
@@ -829,8 +829,8 @@ SPZ.VehicleRegistry = {
     race        = true,
   },
 
-  ["s80rr"] = {
-    model       = "s80rr",
+  ["s80"] = {
+    model       = "s80",
     label       = "Annis S80RR",
     class       = 3,
     top_speed   = 310,
