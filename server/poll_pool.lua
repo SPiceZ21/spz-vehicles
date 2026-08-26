@@ -1,4 +1,12 @@
 -- Poll Pool Logic
+--
+-- Every selector here skips models a client has reported it cannot load
+-- (server/validate.lua). A poll must only ever offer cars the field can
+-- actually spawn — a winning car nobody can load cancels the race.
+
+local function Eligible(name, data, class)
+    return data.class == class and data.race and not IsModelUnavailable(name)
+end
 
 --- Returns N distinct race-eligible vehicles from a class using weighted random selection
 --- @param class number
@@ -10,7 +18,7 @@ function GetPollPool(class, count)
     
     -- 1. Filter race-eligible vehicles for the class
     for name, data in pairs(SPZ.VehicleRegistry) do
-        if data.class == class and data.race then
+        if Eligible(name, data, class) then
             -- Create a local copy to avoid modifying registry
             table.insert(eligible, {
                 model = data.model,
@@ -59,8 +67,8 @@ exports("GetPollPool", GetPollPool)
 --- @return table
 function GetAllPollOptions(class)
     local results = {}
-    for _, data in pairs(SPZ.VehicleRegistry) do
-        if data.class == class and data.race then
+    for name, data in pairs(SPZ.VehicleRegistry) do
+        if Eligible(name, data, class) then
             table.insert(results, {
                 model = data.model,
                 label = data.label,
@@ -78,8 +86,8 @@ exports("GetAllPollOptions", GetAllPollOptions)
 function GetRaceClasses()
     local seen = {}
     local classes = {}
-    for _, data in pairs(SPZ.VehicleRegistry) do
-        if data.race and data.class and not seen[data.class] then
+    for name, data in pairs(SPZ.VehicleRegistry) do
+        if data.race and data.class and not seen[data.class] and not IsModelUnavailable(name) then
             seen[data.class] = true
             table.insert(classes, data.class)
         end
