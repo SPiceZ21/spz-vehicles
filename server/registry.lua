@@ -15,9 +15,18 @@ end)
 function GetVehicleData(model)
     if not model then return nil end
 
-    local name = (type(model) == "number") and _hashToModel[model] or model
-    if not name and type(model) == "string" then name = model end
-    if not name then return nil end
+    -- A hash is only usable if the reverse table knows it. The old line fell
+    -- back to `model` itself when the lookup missed, which left `name` holding a
+    -- NUMBER — and the dynamic-registration path below then called name:sub()
+    -- on it, turning an unknown hash into a hard error instead of a nil.
+    local name
+    if type(model) == "number" then
+        name = _hashToModel[model]
+        if not name then return nil end
+    else
+        name = model
+    end
+    if type(name) ~= "string" or name == "" then return nil end
 
     if not SPZ.VehicleRegistry[name] then
         -- Dynamic registration fallback for vanilla & add-on mod vehicles.

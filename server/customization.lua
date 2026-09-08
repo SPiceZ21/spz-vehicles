@@ -5,18 +5,31 @@ SPZ.Notify = function(src, msg, ntype, time)
     TriggerClientEvent('ox_lib:notify', src, { description = msg, type = ntype, duration = time, position = "center-left" })
 end
 
-RegisterNetEvent("SPZ:vehicle:saveCustom", function(modelHash, preset)
+RegisterNetEvent("SPZ:vehicle:saveCustom", function(modelHash, preset, clientName)
   local src     = source
   local profile = exports["spz-identity"]:GetProfile(src)
-  
+
   if not profile then return end
 
-  local modelName = GetDisplayNameFromVehicleModel(modelHash):lower()
+  -- GetDisplayNameFromVehicleModel is CLIENT ONLY. Calling it here was a nil
+  -- global and killed the handler outright, so no custom look could be saved.
+  --
+  -- The registry resolves a hash for anything it knows (it keeps its own
+  -- hash to name table), and the client sends the display name as well for the
+  -- cars it does not — vanilla and add-on models, which the registry's dynamic
+  -- registration is there to take on.
+  local data = exports["spz-vehicles"]:GetVehicleData(modelHash)
 
-  if not exports["spz-vehicles"]:IsRegistered(modelName) then
+  if not data and type(clientName) == "string" and clientName ~= "" then
+    data = exports["spz-vehicles"]:GetVehicleData(clientName:lower())
+  end
+
+  if not data or not data.model then
     SPZ.Notify(src, "Cannot save — unknown vehicle", "error", 3000)
     return
   end
+
+  local modelName = tostring(data.model):lower()
 
   exports.oxmysql:execute(
     [[INSERT INTO vehicle_customizations (player_id, model, preset)
