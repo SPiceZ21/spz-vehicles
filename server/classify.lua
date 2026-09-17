@@ -35,8 +35,18 @@ local function applyToRegistry(model, stats)
     entry.accel       = stats.accel
     entry.braking     = stats.braking
     entry.handling    = stats.handling
-    entry.poll_weight = entry.poll_weight_override or SPZ.ClassPollWeight(stats.class)
+    entry.poll_weight = SPZ.PollWeightFor(entry, stats.class)
     entry.autoClass   = true
+
+    -- A discovered add-on is held out of the race poll until this point, so it
+    -- can never be offered in the wrong class with placeholder stats. Now that
+    -- the class and the numbers on its card are real, let it in.
+    if entry.racePending then
+        entry.race        = true
+        entry.racePending = nil
+        print(("[spz-vehicles] add-on '%s' classified -> class %d, now in the poll.")
+            :format(model, stats.class))
+    end
 end
 
 -- ── Probing ──────────────────────────────────────────────────────────────────

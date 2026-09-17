@@ -33,6 +33,9 @@ server_scripts {
   'server/freeroam_spawn.lua',
   'server/race_spawn.lua',
   'server/poll_pool.lua',
+  -- After data/vehicles.lua (it registers INTO SPZ.VehicleRegistry) and after
+  -- classify.lua (whose sweep then picks the new models up).
+  'server/addons.lua',
 }
 
 client_scripts {

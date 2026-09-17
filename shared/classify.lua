@@ -44,3 +44,22 @@ function SPZ.ClassPollWeight(class)
     local w = { [0] = 10, [1] = 8, [2] = 6, [3] = 4 }
     return w[class] or 6
 end
+
+--- The weight an entry should actually carry in the poll.
+---
+--- One place, because two computed it and they would have drifted:
+--- server/classify.lua sets it whenever a probe lands, and server/addons.lua
+--- has to set something sensible before any probe has happened.
+---
+--- `poll_weight_override` still wins outright — a hand-tuned number in
+--- data/vehicles.lua is a decision, and the add-on boost is a default.
+function SPZ.PollWeightFor(entry, class)
+    if entry and entry.poll_weight_override then return entry.poll_weight_override end
+
+    local w = SPZ.ClassPollWeight(class)
+    local cfg = (Config and Config.Addons) or {}
+    if entry and entry.isAddon then
+        w = w * (tonumber(cfg.PollBoost) or 1.0)
+    end
+    return math.max(1, math.floor(w + 0.5))
+end
