@@ -55,74 +55,174 @@ end
 
 -- ── Reading vehicles.meta ────────────────────────────────────────────────────
 
---- Model names declared by one resource.
+--- Model names in one vehicles.meta, filtered by declared <type>.
 ---
---- `data_file 'VEHICLE_METADATA_FILE' 'vehicles.meta'` is stored as a pair: the
---- TYPE under the `data_file` key and the PATH under `data_file_extra` at the
---- same index. Only VEHICLE_METADATA_FILE entries are read; a pack also ships
---- handling.meta, carcols.meta and so on, and none of those list models.
----
---- The model name is pulled with a pattern rather than a parser. That is a
---- deliberate limit, not an oversight: vehicles.meta nests <Item> elements
---- several levels deep (doors, mods, seats), so matching blocks is more fragile
---- than matching the one tag that is unique per vehicle and always present.
+--- The model name is pulled with a pattern rather than a parser: vehicles.meta
+--- nests <Item> elements several levels deep (doors, mods, seats), so matching
+--- blocks is more fragile than matching the one tag that is unique per vehicle.
 ---
 --- The declared <type> is paired to it by POSITION — the first one after this
---- model name and before the next. That is the order every stock-format
---- vehicles.meta uses, and it filters out the bikes, boats and helicopters a
---- pack may ship alongside its cars. Without it, "car pack" support quietly
---- means putting a boat in the race poll. An entry with no <type> at all is
---- kept: a malformed line should not silently vanish, and validate.lua drops
---- anything that will not actually load.
+--- model name and before the next — which filters out the bikes, boats and
+--- helicopters a pack may ship alongside its cars. An entry with no <type> is
+--- kept; validate.lua drops anything that will not actually load.
+local function extractModels(raw, out)
+    local names, types = {}, {}
+    for pos, model in raw:gmatch("()<modelName>%s*([%w_%-]+)%s*</modelName>") do
+        names[#names + 1] = { pos = pos, model = model:lower() }
+    end
+    for pos, t in raw:gmatch("()<type>%s*(VEHICLE_TYPE_%u+)%s*</type>") do
+        types[#types + 1] = { pos = pos, t = t }
+    end
+
+    local allow = cfg().AllowTypes or { VEHICLE_TYPE_CAR = true }
+    for i, entry in ipairs(names) do
+        local stop = names[i + 1] and names[i + 1].pos or (#raw + 1)
+        local declared
+        for _, ty in ipairs(types) do
+            if ty.pos > entry.pos and ty.pos < stop then declared = ty.t break end
+        end
+        if declared == nil or allow[declared] then
+            out[#out + 1] = entry.model
+        end
+    end
+end
+
+-- ── Wildcard paths ───────────────────────────────────────────────────────────
+--
+-- Multi-car packs almost always declare their meta with a wildcard:
+--
+--     data_file 'VEHICLE_METADATA_FILE' 'data/**/vehicles.meta'
+--
+-- The first version of this file skipped those with a warning, because
+-- LoadResourceFile cannot list a directory — which meant a typical car pack was
+-- discovered as ZERO cars and the poll quietly stayed on base-game vehicles.
+--
+-- So the pattern is resolved against the resource's real files on disk: list
+-- everything under GetResourcePath(res) once, and match the glob against the
+-- relative paths. `**` spans directories, `*` stays inside one.
+--
+-- A false positive here is harmless — a matched file that is not a
+-- vehicles.meta has no <modelName> tags and contributes nothing — so the glob
+-- translation errs on the side of matching.
+
+local isWindows = package.config:sub(1, 1) == "\\"
+
+--- Every file under a resource, as forward-slash paths relative to its root.
+--- nil when the listing is not possible on this host.
+local function listFiles(res)
+    local root = GetResourcePath(res)
+    if not root or root == "" then return nil end
+    root = root:gsub("\\", "/"):gsub("/+$", "")
+
+    local cmd = isWindows
+        and ('dir /s /b /a-d "' .. root:gsub("/", "\\") .. '" 2>nul')
+        or  ('find "' .. root .. '" -type f 2>/dev/null')
+
+    local ok, handle = pcall(io.popen, cmd)
+    if not ok or not handle then return nil end
+
+    local files = {}
+    local prefix = root:lower() .. "/"
+    for line in handle:lines() do
+        local path = line:gsub("\r", ""):gsub("\\", "/")
+        if path:lower():sub(1, #prefix) == prefix then
+            files[#files + 1] = path:sub(#prefix + 1)
+        end
+    end
+    handle:close()
+    return files
+end
+
+--- Glob -> anchored Lua pattern.  ** = anything (including /), * = anything
+--- but /, ? = one char but /.
+local function globToPattern(glob)
+    glob = glob:gsub("\\", "/"):gsub("^%./", "")
+    local out, i = { "^" }, 1
+    while i <= #glob do
+        local c = glob:sub(i, i)
+        if c == "*" then
+            if glob:sub(i + 1, i + 1) == "*" then
+                out[#out + 1] = ".-"
+                i = i + 2
+                if glob:sub(i, i) == "/" then i = i + 1 end   -- "**/" may match no dirs
+            else
+                out[#out + 1] = "[^/]*"
+                i = i + 1
+            end
+        elseif c == "?" then
+            out[#out + 1] = "[^/]"
+            i = i + 1
+        elseif c:match("[%^%$%(%)%%%.%[%]%+%-]") then
+            out[#out + 1] = "%" .. c
+            i = i + 1
+        else
+            out[#out + 1] = c
+            i = i + 1
+        end
+    end
+    out[#out + 1] = "$"
+    return table.concat(out):lower()
+end
+
+--- The path half of a data_file entry. The server stores it JSON-encoded
+--- (`"data/vehicles.meta"`, quotes included), so a raw LoadResourceFile on it
+--- finds nothing. Decode when it looks encoded; pass it through otherwise.
+local function metaPath(extra)
+    if type(extra) ~= "string" or extra == "" then return nil end
+    local first = extra:sub(1, 1)
+    if first == '"' or first == "[" or first == "{" then
+        local ok, v = pcall(json.decode, extra)
+        if ok then
+            if type(v) == "string" then return v end
+            if type(v) == "table" and type(v[1]) == "string" then return v[1] end
+        end
+        return (extra:gsub('^"(.*)"$', "%1"))
+    end
+    return extra
+end
+
+--- Model names declared by one resource, plus a note on anything that could
+--- not be read, for the scan log.
+---
+--- `data_file 'VEHICLE_METADATA_FILE' 'path'` is stored as a pair: the TYPE
+--- under `data_file` and the PATH under `data_file_extra` at the same index.
 local function modelsIn(res)
-    local out = {}
+    local out, notes = {}, {}
     local n = GetNumResourceMetadata(res, "data_file") or 0
+    local listing   -- fetched once per resource, only if a wildcard needs it
 
     for i = 0, n - 1 do
-        local kind = GetResourceMetadata(res, "data_file", i)
-        if kind == "VEHICLE_METADATA_FILE" then
-            local path = GetResourceMetadata(res, "data_file_extra", i)
+        if GetResourceMetadata(res, "data_file", i) == "VEHICLE_METADATA_FILE" then
+            local path = metaPath(GetResourceMetadata(res, "data_file_extra", i))
 
-            -- A wildcard path (data/*.meta) cannot be read back through
-            -- LoadResourceFile — there is no directory listing available to a
-            -- resource. Say so rather than silently finding nothing.
-            if path and path:find("%*") then
-                print(("^3[spz-vehicles] %s declares '%s' with a wildcard — "
-                    .. "list the .meta files individually for auto-discovery to see them.^7")
-                    :format(res, path))
+            if path and path:find("[%*%?]") then
+                if listing == nil then listing = listFiles(res) or false end
+                if not listing then
+                    notes[#notes + 1] = ("'%s' is a wildcard and this host cannot list files"):format(path)
+                else
+                    local pat, hits = globToPattern(path), 0
+                    for _, rel in ipairs(listing) do
+                        if rel:lower():match(pat) then
+                            local raw = LoadResourceFile(res, rel)
+                            if raw then extractModels(raw, out); hits = hits + 1 end
+                        end
+                    end
+                    if hits == 0 then
+                        notes[#notes + 1] = ("'%s' matched no files"):format(path)
+                    end
+                end
             elseif path then
                 local raw = LoadResourceFile(res, path)
                 if raw then
-                    -- Positions of every model name, then of every type, so the
-                    -- two can be paired by document order.
-                    local names, types = {}, {}
-                    for pos, model in raw:gmatch("()<modelName>%s*([%w_%-]+)%s*</modelName>") do
-                        names[#names + 1] = { pos = pos, model = model:lower() }
-                    end
-                    for pos, t in raw:gmatch("()<type>%s*(VEHICLE_TYPE_%u+)%s*</type>") do
-                        types[#types + 1] = { pos = pos, t = t }
-                    end
-
-                    local allow = cfg().AllowTypes or { VEHICLE_TYPE_CAR = true }
-                    for i, entry in ipairs(names) do
-                        local stop = names[i + 1] and names[i + 1].pos or (#raw + 1)
-                        local declared
-                        for _, ty in ipairs(types) do
-                            if ty.pos > entry.pos and ty.pos < stop then declared = ty.t break end
-                        end
-                        if declared == nil or allow[declared] then
-                            out[#out + 1] = entry.model
-                        end
-                    end
+                    extractModels(raw, out)
                 else
-                    print(("^3[spz-vehicles] %s declares '%s' but it could not be read.^7")
-                        :format(res, path))
+                    notes[#notes + 1] = ("'%s' could not be read"):format(path)
                 end
             end
         end
     end
 
-    return out
+    return out, notes
 end
 
 -- ── Registration ─────────────────────────────────────────────────────────────
@@ -176,6 +276,10 @@ local function register(model, res)
 
     SPZ.VehicleRegistry[model] = entry
     DISCOVERED[model] = res
+
+    -- Classified on an earlier boot? Then it has real numbers already — apply
+    -- them now and it is in the poll immediately (see server/classify.lua).
+    if SPZ.ApplyCachedClass then SPZ.ApplyCachedClass(model) end
     return true
 end
 
@@ -190,7 +294,10 @@ local function scan(reason)
     for i = 0, GetNumResources() - 1 do
         local res = GetResourceByFindIndex(i)
         if res and res ~= GetCurrentResourceName() and GetResourceState(res) == "started" then
-            local models = modelsIn(res)
+            local models, notes = modelsIn(res)
+            for _, note in ipairs(notes) do
+                print(("^3[spz-vehicles] add-ons: %s — %s^7"):format(res, note))
+            end
             if #models > 0 then
                 local fromThis = 0
                 for _, model in ipairs(models) do
@@ -205,16 +312,35 @@ local function scan(reason)
         end
     end
 
+    if added > 0 and SPZ.RequestClassification then
+        -- Anything not in the cache gets probed by an online client now,
+        -- rather than waiting for the next 5-minute sweep.
+        SetTimeout(1000, SPZ.RequestClassification)
+    end
+
     if added > 0 then
         print(("^2[spz-vehicles] add-ons: registered %d new vehicle(s) from %d declared — %s^7")
             :format(added, seen, table.concat(packs, ", ")))
         print("^2[spz-vehicles] ...classification will follow from a real performance probe; "
             .. "they enter the poll once classified.^7")
+    elseif seen == 0 and reason ~= "hotload" then
+        print("^3[spz-vehicles] add-ons: no VEHICLE_METADATA_FILE found in any started "
+            .. "resource. Is the car pack ensured in server.cfg, and does its "
+            .. "fxmanifest declare data_file 'VEHICLE_METADATA_FILE'?^7")
     elseif reason == "boot" and seen > 0 then
         print(("^2[spz-vehicles] add-ons: %d declared vehicle(s) already known.^7"):format(seen))
     end
 
     scanned = true
+
+    -- Publish the set so CLIENTS can tell an add-on from a base-game car.
+    -- spz-carspawner uses it to list add-ons in their own section and to let
+    -- them past its race-class filter; before this it guessed from whether a
+    -- car had a text label, which a properly packaged pack defeats.
+    local set = {}
+    for model, res in pairs(DISCOVERED) do set[model] = res end
+    GlobalState.spzAddonModels = set
+
     return added, seen
 end
 

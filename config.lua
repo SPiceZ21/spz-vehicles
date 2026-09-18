@@ -60,6 +60,13 @@ Config.Addons = {
   -- outnumbered by the curated roster in every one of them.
   PollBoost    = 2.0,
 
+  -- Add-ons FIRST, vanilla second. The poll offers one car per class; with
+  -- this on, classes that contain add-on cars are chosen before classes that
+  -- do not, and inside a class every slot is filled from add-ons before any
+  -- vanilla car is considered. Vanilla cars appear only when add-ons cannot
+  -- fill the poll. false = one shared pool, add-ons just weighted by PollBoost.
+  Prioritize   = true,
+
   -- Which declared <type> values are registered. A pack that ships bikes,
   -- boats or helicopters alongside its cars is the normal case, and without
   -- this "car pack support" quietly means a boat in the race poll. Add

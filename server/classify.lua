@@ -9,7 +9,10 @@
 
 local CACHE_FILE = "classify_cache.json"
 local Cache      = {}      -- [model] = { class, top_speed, accel, braking, handling, perf }
-local pending    = {}      -- [model] = true while awaiting a probe
+local pending    = {}      -- [model] = GetGameTimer() when the probe was sent
+local PENDING_TTL = 120000 -- a probe unanswered this long is asked again: the
+                           -- client drops models it could not load and may
+                           -- disconnect mid-batch, so "pending" must expire
 local dirty      = false
 
 -- ── Cache load/save ──────────────────────────────────────────────────────────
@@ -61,10 +64,11 @@ local function requestMissing()
     local src = anyClient()
     if not src then return end            -- nobody online; retry later
 
-    local todo = {}
+    local now, todo = GetGameTimer(), {}
     for model in pairs(SPZ.VehicleRegistry) do
-        if not Cache[model] and not pending[model] then
-            pending[model] = true
+        local sent = pending[model]
+        if not Cache[model] and (not sent or now - sent > PENDING_TTL) then
+            pending[model] = now
             todo[#todo + 1] = model
         end
     end
@@ -127,3 +131,16 @@ RegisterCommand("reclassify", function(src)
 end, false)
 
 exports("GetClassification", function(model) return Cache[model] end)
+
+-- For server/addons.lua. Add-ons are registered ~2 s AFTER the boot pass above
+-- has applied the cache, so without this a pack car classified on an earlier
+-- boot would be registered as unclassified, skipped by requestMissing (it IS
+-- cached) and never enter the poll again.
+SPZ.ApplyCachedClass = function(model)
+    local stats = Cache[model]
+    if stats then applyToRegistry(model, stats) return true end
+    return false
+end
+
+-- Probe newly registered models now instead of at the next 5-minute sweep.
+SPZ.RequestClassification = requestMissing
