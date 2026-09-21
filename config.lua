@@ -79,6 +79,19 @@ Config.Addons = {
   Exclude      = {
     "^police", "^sheriff", "^ambulance", "^firetruk", "^fbi",
     "^riot", "^pbus", "^taxi",
+
+    -- Gabz emergency vehicles. Their own resource is excluded below, so this
+    -- is the belt-and-braces rule for a pack that mixes them into a car
+    -- resource.
+    "^gbpol", "^gbems", "^gbfire", "^gbsher",
+  },
+
+  -- Whole resources to skip, matched case-insensitively against the resource
+  -- name as Lua patterns. A pack normally splits its emergency fleet into its
+  -- own resource — gb_vehicles_pd_ems is 30 police cars and 3 ambulances, none
+  -- of which belong in a race poll.
+  ExcludeResources = {
+    "pd_ems", "_police", "_ems$", "emergency",
   },
 }
 

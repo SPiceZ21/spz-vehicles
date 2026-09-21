@@ -40,6 +40,7 @@ server_scripts {
 
 client_scripts {
   'client/main.lua',
+  'client/addon_scan.lua',
   'client/classify.lua',
   'client/validate.lua',
   'client/spawn.lua',

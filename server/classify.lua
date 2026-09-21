@@ -8,19 +8,37 @@
 -- CLASS + STATS are computed here so they always match real performance.
 
 local CACHE_FILE = "classify_cache.json"
+local CACHE_SCHEMA = 2
 local Cache      = {}      -- [model] = { class, top_speed, accel, braking, handling, perf }
 local pending    = {}      -- [model] = GetGameTimer() when the probe was sent
 local PENDING_TTL = 120000 -- a probe unanswered this long is asked again: the
                            -- client drops models it could not load and may
                            -- disconnect mid-batch, so "pending" must expire
+local PROBE_BATCH_SIZE = 20 -- never make one slow streamed car hold up the pack
 local dirty      = false
+
+-- Actual road-car GTA classes. Performance numbers alone make a tanker look
+-- like a slow Class C car, which is why it leaked into the race poll.
+local RACE_VEHICLE_CLASSES = {
+    [0] = true, [1] = true, [2] = true, [3] = true, [4] = true,
+    [5] = true, [6] = true, [7] = true, [9] = true, [12] = true,
+    [22] = true,
+}
 
 -- ── Cache load/save ──────────────────────────────────────────────────────────
 local function loadCache()
     local raw = LoadResourceFile(GetCurrentResourceName(), CACHE_FILE)
     if not raw then return end
     local ok, data = pcall(json.decode, raw)
-    if ok and type(data) == "table" then Cache = data end
+    if ok and type(data) == "table" then
+        Cache = data
+        -- Old cache rows had no GTA vehicle class. Re-probe once so trucks,
+        -- trailers and aircraft can be removed from every add-on pool.
+        if Cache._schema ~= CACHE_SCHEMA then
+            Cache = { _schema = CACHE_SCHEMA }
+            dirty = true
+        end
+    end
 end
 
 local function saveCache()
@@ -33,6 +51,14 @@ end
 local function applyToRegistry(model, stats)
     local entry = SPZ.VehicleRegistry and SPZ.VehicleRegistry[model]
     if not entry then return end
+
+    if entry.isAddon and stats.vehicleClass ~= nil and not RACE_VEHICLE_CLASSES[stats.vehicleClass] then
+        entry.race = false
+        entry.racePending = nil
+        print(("^3[spz-vehicles] add-on '%s' ignored: GTA vehicle class %d is not raceable.^7")
+            :format(model, stats.vehicleClass))
+        return
+    end
     entry.class       = stats.class
     entry.top_speed   = stats.top_speed
     entry.accel       = stats.accel
@@ -41,14 +67,26 @@ local function applyToRegistry(model, stats)
     entry.poll_weight = SPZ.PollWeightFor(entry, stats.class)
     entry.autoClass   = true
 
+    entry.vehicleClass = stats.vehicleClass
+
     -- A discovered add-on is held out of the race poll until this point, so it
     -- can never be offered in the wrong class with placeholder stats. Now that
-    -- the class and the numbers on its card are real, let it in.
+    -- the class and the numbers on its card are real, decide.
     if entry.racePending then
-        entry.race        = true
         entry.racePending = nil
-        print(("[spz-vehicles] add-on '%s' classified -> class %d, now in the poll.")
-            :format(model, stats.class))
+
+        if SPZ.IsRaceVehicleClass(stats.vehicleClass) then
+            entry.race = true
+            print(("[spz-vehicles] add-on '%s' classified -> class %d, now in the poll.")
+                :format(model, stats.class))
+        else
+            -- Spawnable in freeroam, never offered in a race: a van, a tow
+            -- truck, a boat or — the common case in a car pack — a police
+            -- interceptor, which is fast enough to win the top class outright.
+            entry.race = false
+            print(("[spz-vehicles] add-on '%s' is GTA class %d — freeroam only, kept out of the poll.")
+                :format(model, stats.vehicleClass))
+        end
     end
 end
 
@@ -65,13 +103,22 @@ local function requestMissing()
     if not src then return end            -- nobody online; retry later
 
     local now, todo = GetGameTimer(), {}
-    for model in pairs(SPZ.VehicleRegistry) do
-        local sent = pending[model]
-        if not Cache[model] and (not sent or now - sent > PENDING_TTL) then
-            pending[model] = now
-            todo[#todo + 1] = model
+    local function collect(addonsOnly)
+        for model, entry in pairs(SPZ.VehicleRegistry) do
+            local sent = pending[model]
+            if (not addonsOnly or entry.isAddon) and not Cache[model]
+                and (not sent or now - sent > PENDING_TTL) then
+                pending[model] = now
+                todo[#todo + 1] = model
+                if #todo >= PROBE_BATCH_SIZE then return true end
+            end
         end
+        return false
     end
+
+    -- Pack cars get their real stats first, so they become poll-ready before
+    -- the much larger curated/base-game registry finishes its background pass.
+    if not collect(true) then collect(false) end
     if #todo == 0 then return end
 
     print(("[spz-vehicles] Classifying %d vehicle(s) from real performance…"):format(#todo))
@@ -85,6 +132,7 @@ RegisterNetEvent("SPZ:vehicle:probeResult", function(results)
         pending[model] = nil
         if type(raw) == "table" then
             local stats = SPZ.ClassifyStats(raw)
+            stats.vehicleClass = raw.vehicleClass
             Cache[model] = stats
             applyToRegistry(model, stats)
             dirty = true
@@ -95,6 +143,11 @@ RegisterNetEvent("SPZ:vehicle:probeResult", function(results)
         print(("[spz-vehicles] Classified %d vehicle(s)."):format(n))
         saveCache()
     end
+
+    -- Continue automatically until every newly discovered model is cached.
+    -- The old implementation sent the entire registry in one request; a single
+    -- streamed model timing out kept the response from reaching later add-ons.
+    SetTimeout(100, requestMissing)
 end)
 
 -- ── Boot ─────────────────────────────────────────────────────────────────────
@@ -103,6 +156,7 @@ AddEventHandler("onResourceStart", function(res)
     loadCache()
     -- Apply whatever we already know immediately.
     for model, stats in pairs(Cache) do applyToRegistry(model, stats) end
+    saveCache()
 end)
 
 -- Probe when someone joins (first client online triggers the initial sweep) and

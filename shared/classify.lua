@@ -36,7 +36,41 @@ function SPZ.ClassifyStats(raw)
         braking     = math.floor(sBrake + 0.5),
         handling    = math.floor((sTrac + sBrake) / 2 + 0.5),
         perf        = math.floor(perf + 0.5),
+
+        -- GTA's own class for the model, carried through from the probe so the
+        -- server can tell a race car from a tow truck. Cached with the rest, so
+        -- an entry classified before this field existed simply has no value —
+        -- see SPZ.IsRaceVehicleClass.
+        vehicleClass = raw.vehicleClass,
     }
+end
+
+--- Whether a GTA vehicle class belongs in a race.
+---
+--- Performance alone cannot make this call: a fire truck and an ambulance can
+--- both out-accelerate a hatchback, and a pack's police cars are usually its
+--- FASTEST models — they are tuned pursuit versions. Judging on numbers alone
+--- puts them straight into the top class of the poll.
+---
+--- Unknown (nil) is allowed through. Entries cached before the probe reported
+--- this field have no value, and refusing those would silently empty the poll
+--- until every car was re-probed.
+local RACE_VEHICLE_CLASSES = {
+    [0]  = true,  -- Compacts
+    [1]  = true,  -- Sedans
+    [2]  = true,  -- SUVs
+    [3]  = true,  -- Coupes
+    [4]  = true,  -- Muscle
+    [5]  = true,  -- Sports Classics
+    [6]  = true,  -- Sports
+    [7]  = true,  -- Super
+    [9]  = true,  -- Off-road
+    [22] = true,  -- Open Wheel
+}
+
+function SPZ.IsRaceVehicleClass(vehicleClass)
+    if vehicleClass == nil then return true end
+    return RACE_VEHICLE_CLASSES[vehicleClass] == true
 end
 
 -- Poll weight from tier: keep lower classes a touch more common.

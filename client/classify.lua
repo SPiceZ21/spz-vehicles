@@ -19,6 +19,7 @@ local function probe(modelName)
         accel    = GetVehicleModelAcceleration(hash),
         braking  = GetVehicleModelMaxBraking(hash),
         traction = GetVehicleModelMaxTraction(hash),
+        vehicleClass = GetVehicleClassFromName(hash),  -- GTA class: rejects trucks/trailers/boats/etc.
     }
 
     SetModelAsNoLongerNeeded(hash)

@@ -42,15 +42,27 @@ end
 
 -- ── Exclusions ───────────────────────────────────────────────────────────────
 
-local function excluded(model)
-    local low = model:lower()
-    for _, pat in ipairs(cfg().Exclude or {}) do
+local function matchesAny(text, patterns)
+    local low = text:lower()
+    for _, pat in ipairs(patterns or {}) do
         -- pcall because these are user-supplied patterns and a malformed one
         -- should skip that rule, not take the whole scan down.
         local ok, hit = pcall(string.match, low, pat:lower())
         if ok and hit then return true end
     end
     return false
+end
+
+local function excluded(model)
+    return matchesAny(model, cfg().Exclude)
+end
+
+--- Whole resources to skip. A pack usually splits its emergency vehicles into
+--- their own resource (gb_vehicles_pd_ems), which is cheaper and more reliable
+--- to exclude by name than to catch car by car. The GTA class check in
+--- server/classify.lua is the backstop for anything that slips through.
+local function excludedResource(res)
+    return matchesAny(res, cfg().ExcludeResources)
 end
 
 -- ── Reading vehicles.meta ────────────────────────────────────────────────────
@@ -105,13 +117,16 @@ end
 -- vehicles.meta has no <modelName> tags and contributes nothing — so the glob
 -- translation errs on the side of matching.
 
-local isWindows = package.config:sub(1, 1) == "\\"
-
 --- Every file under a resource, as forward-slash paths relative to its root.
 --- nil when the listing is not possible on this host.
 local function listFiles(res)
-    local root = GetResourcePath(res)
-    if not root or root == "" then return nil end
+    local rawRoot = GetResourcePath(res)
+    if not rawRoot or rawRoot == "" then return nil end
+
+    -- package.config is nil in the FXServer sandbox. The resource path itself
+    -- is authoritative: Windows paths contain backslashes; Linux paths do not.
+    local isWindows = rawRoot:find("\\", 1, true) ~= nil
+    local root = rawRoot
     root = root:gsub("\\", "/"):gsub("/+$", "")
 
     local cmd = isWindows
@@ -181,6 +196,37 @@ local function metaPath(extra)
     return extra
 end
 
+--- Models from a spawn-name list shipped at a FIXED path in the resource root.
+---
+--- Gabz packs (and several others built from the same template) ship
+--- `vehicle_spawn_names.txt`, one model name per line. That is worth reading
+--- first: it needs no wildcard expansion and no directory listing, so it works
+--- on hosts where io.popen is unavailable — which is exactly where the meta
+--- scan gives up.
+---
+--- It carries no <type>, so bikes and boats in a mixed pack are not filtered
+--- here. The GTA class check after the performance probe is what keeps those
+--- out of races.
+local SPAWN_NAME_FILES = { "vehicle_spawn_names.txt", "vehicle_names.txt" }
+
+local function modelsFromSpawnList(res, out)
+    for _, file in ipairs(SPAWN_NAME_FILES) do
+        local raw = LoadResourceFile(res, file)
+        if raw then
+            local n = 0
+            for line in raw:gmatch("[^\r\n]+") do
+                local model = line:match("^%s*([%w_%-]+)%s*$")
+                if model then
+                    out[#out + 1] = model:lower()
+                    n = n + 1
+                end
+            end
+            if n > 0 then return file, n end
+        end
+    end
+    return nil, 0
+end
+
 --- Model names declared by one resource, plus a note on anything that could
 --- not be read, for the scan log.
 ---
@@ -219,6 +265,17 @@ local function modelsIn(res)
                     notes[#notes + 1] = ("'%s' could not be read"):format(path)
                 end
             end
+        end
+    end
+
+    -- Nothing from the manifest: fall back to the pack's own spawn-name list.
+    -- This is the path that actually carries a Gabz pack on a hosted server,
+    -- where its 'data/**/vehicles.meta' cannot be expanded.
+    if #out == 0 then
+        local file, n = modelsFromSpawnList(res, out)
+        if file then
+            notes[#notes + 1] = ("read %d model(s) from %s (manifest wildcard unreadable)")
+                :format(n, file)
         end
     end
 
@@ -283,6 +340,14 @@ local function register(model, res)
     return true
 end
 
+-- Keep the client-visible add-on set in one place. The car spawner reads this
+-- state bag instead of attempting to call a server-only registry export.
+local function publish()
+    local set = {}
+    for model, res in pairs(DISCOVERED) do set[model] = res end
+    GlobalState.spzAddonModels = set
+end
+
 -- ── Scan ─────────────────────────────────────────────────────────────────────
 
 local function scan(reason)
@@ -293,7 +358,8 @@ local function scan(reason)
 
     for i = 0, GetNumResources() - 1 do
         local res = GetResourceByFindIndex(i)
-        if res and res ~= GetCurrentResourceName() and GetResourceState(res) == "started" then
+        if res and res ~= GetCurrentResourceName() and GetResourceState(res) == "started"
+           and not excludedResource(res) then
             local models, notes = modelsIn(res)
             for _, note in ipairs(notes) do
                 print(("^3[spz-vehicles] add-ons: %s — %s^7"):format(res, note))
@@ -337,9 +403,7 @@ local function scan(reason)
     -- spz-carspawner uses it to list add-ons in their own section and to let
     -- them past its race-class filter; before this it guessed from whether a
     -- car had a text label, which a properly packaged pack defeats.
-    local set = {}
-    for model, res in pairs(DISCOVERED) do set[model] = res end
-    GlobalState.spzAddonModels = set
+    publish()
 
     return added, seen
 end
@@ -390,6 +454,37 @@ RegisterCommand("spzaddons", function(src)
     print(("^5── %d discovered · boost x%.1f · race=%s ──────────────^7")
         :format(n, tonumber(cfg().PollBoost) or 1.0, tostring(cfg().Race ~= false)))
 end, true)
+
+-- Some car packs use a manifest wildcard that a hosted FXServer cannot expand,
+-- or stream models without declaring vehicles.meta at all. A connected client
+-- can see the streamed model list, so it supplies only models without a GTA
+-- text label as a fallback. The cap and strict model-name check keep this from
+-- becoming an unbounded registry write from a client event.
+RegisterNetEvent("SPZ:vehicle:reportAddonModels", function(models)
+    if type(models) ~= "table" then return end
+
+    local added = 0
+    local sourceName = ("client:%d"):format(source)
+    for i = 1, math.min(#models, 400) do
+        local model = models[i]
+        if type(model) == "string" then
+            model = model:lower()
+            if #model <= 64 and model:match("^[%w_%-]+$") and register(model, sourceName) then
+                added = added + 1
+            end
+        end
+    end
+
+    print(("^5[spz-vehicles] add-on client scan: %d candidate(s), %d new from player %d.^7")
+        :format(math.min(#models, 400), added, source))
+
+    if added > 0 then
+        publish()
+        print(("^2[spz-vehicles] add-ons: registered %d streamed vehicle(s) reported by player %d.^7")
+            :format(added, source))
+        if SPZ.RequestClassification then SetTimeout(1000, SPZ.RequestClassification) end
+    end
+end)
 
 RegisterCommand("spzaddonscan", function(src)
     if src ~= 0 and not IsPlayerAceAllowed(src, "spz.admin") then return end
