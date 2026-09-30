@@ -83,3 +83,16 @@ RegisterNetEvent("SPZ:vehicle:applyCustom", function(netId, preset)
     SetVehicleMod(vehicle, tonumber(slot), modIndex, false)
   end
 end)
+
+--- The player's personal vanity plate, applied after any saved preset so it is
+--- the last word on the plate text. Sent for every spawn, preset or not.
+RegisterNetEvent("SPZ:vehicle:applyPlate", function(netId, plate)
+  if not plate or plate == "" then return end
+
+  local vehicle = NetToVeh(netId)
+  local timeout = 50
+  while not DoesEntityExist(vehicle) and timeout > 0 do Wait(50); timeout = timeout - 1 end
+  if not DoesEntityExist(vehicle) then return end
+
+  SetVehicleNumberPlateText(vehicle, plate)
+end)

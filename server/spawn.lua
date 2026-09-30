@@ -248,6 +248,23 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
                 TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
             end
         end
+
+        -- 9b. Personal vanity plate, AFTER the preset on purpose.
+        --
+        -- applyCustom sets plate_text from the saved preset, which is whatever
+        -- plate that car happened to wear when it was saved -- usually a random
+        -- game-generated one. The player's chosen plate has to land last or the
+        -- preset would keep overwriting it on every spawn.
+        --
+        -- Sent separately rather than folded into the preset so it still
+        -- applies to cars with no saved customization at all, which is most of
+        -- them for most players.
+        local pOk, plate = pcall(function()
+            return exports["spz-identity"]:GetPlate(src)
+        end)
+        if pOk and plate and plate ~= "" then
+            TriggerClientEvent("SPZ:vehicle:applyPlate", src, active.netId, plate)
+        end
     end
 
     -- 10. Place player in seat
