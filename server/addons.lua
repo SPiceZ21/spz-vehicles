@@ -492,4 +492,3 @@ RegisterCommand("spzaddonscan", function(src)
     print(("[spz-vehicles] rescan: %d new, %d declared."):format(added, seen))
 end, true)
 
-exports("GetDiscoveredAddons", function() return DISCOVERED end)

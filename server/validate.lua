@@ -27,7 +27,6 @@ function IsModelUnavailable(model)
     if not model then return false end
     return SPZ.UnavailableModels[tostring(model):lower()] == true
 end
-exports("IsModelUnavailable", IsModelUnavailable)
 
 --- A registered, race-eligible model that clients can actually load. Used as the
 --- spawn fallback: the configured one is preferred, but a fallback that is
@@ -44,7 +43,6 @@ function ResolveFallbackModel()
     end
     return configured   -- registry empty/all broken: nothing better to offer
 end
-exports("ResolveFallbackModel", ResolveFallbackModel)
 
 -- ── Client round trip ────────────────────────────────────────────────────────
 

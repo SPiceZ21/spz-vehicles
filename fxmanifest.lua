@@ -30,7 +30,6 @@ server_scripts {
   'server/spawn.lua',
   'server/upgrades.lua',
   'server/customization.lua',
-  'server/freeroam_spawn.lua',
   'server/race_spawn.lua',
   'server/poll_pool.lua',
   -- After data/vehicles.lua (it registers INTO SPZ.VehicleRegistry) and after

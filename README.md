@@ -37,10 +37,10 @@ that `spz-poll` votes on.
 
 | Group | Exports |
 |---|---|
-| Registry | `GetVehicleRegistry` · `GetVehicleData` · `IsRegistered` · `GetClassMeta` · `GetClassVehicles` · `GetRaceClasses` |
-| Spawning | `SpawnVehicle` · `FreeroamSpawn` · `SpawnRaceVehicle` · `DespawnVehicle` · `GetPlayerVehicle` · `GetFreeroamVehicles` |
+| Registry | `GetVehicleRegistry` · `GetVehicleData` · `IsRegistered` · `GetClassMeta` · `GetRaceClasses` |
+| Spawning | `SpawnVehicle` · `SpawnRaceVehicle` · `DespawnVehicle` · `GetPlayerVehicle` |
 | Poll pool | `GetPollPool` · `GetAllPollOptions` |
-| Customization | `LoadCustomization` · `ResetCustomization` |
+| Customization | `LoadCustomization` |
 | Unlocks | `UnlockRaceVehicle` |
 
 ## Commands

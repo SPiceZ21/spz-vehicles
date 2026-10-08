@@ -58,33 +58,6 @@ function GetVehicleData(model)
     return SPZ.VehicleRegistry[name]
 end
 
---- Returns a list of vehicles belonging to a specific class with optional filtering
---- @param class number
---- @param filters table | nil { race = bool, freeroam = bool }
---- @return table
-function GetClassVehicles(class, filters)
-    local results = {}
-    for _, data in pairs(SPZ.VehicleRegistry) do
-        if data.class == class then
-            local match = true
-            
-            if filters then
-                for key, value in pairs(filters) do
-                    if data[key] ~= value then
-                        match = false
-                        break
-                    end
-                end
-            end
-
-            if match then
-                table.insert(results, data)
-            end
-        end
-    end
-    return results
-end
-
 --- Checks if a vehicle model is registered
 --- @param model string | number
 --- @return boolean
@@ -120,7 +93,6 @@ function GetVehicleRegistry()
 end
 
 exports("GetVehicleData", GetVehicleData)
-exports("GetClassVehicles", GetClassVehicles)
 exports("IsRegistered", IsRegistered)
 exports("GetClassMeta", GetClassMeta)
 exports("GetRaceClasses", GetRaceClasses)

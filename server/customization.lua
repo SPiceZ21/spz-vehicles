@@ -68,7 +68,6 @@ function ResetCustomization(src, model)
 end
 
 exports("LoadCustomization", LoadCustomization)
-exports("ResetCustomization", ResetCustomization)
 
 RegisterCommand("resetcustom", function(source, args)
   local model = args[1]
