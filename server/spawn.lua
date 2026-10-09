@@ -233,6 +233,14 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     active.upgraded = true
     print(string.format("[spz-vehicles] DEBUG: Upgrades applied for player %s (netId %s). Type: %s", src, netId, active.type))
 
+    -- Personal vanity plate (spz-identity). Fetched first so it can be folded
+    -- into the preset below and set on the entity server-side.
+    local vanity = nil
+    do
+        local pOk, plate = pcall(function() return exports["spz-identity"]:GetPlate(src) end)
+        if pOk and type(plate) == "string" and plate ~= "" then vanity = plate end
+    end
+
     -- 8. Load customization (skip for rentals)
     if not active.isRental then
         local ok, profile = pcall(function()
@@ -244,27 +252,27 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
                 return exports["spz-vehicles"]:LoadCustomization(profile.id, active.model)
             end)
             if cOk and preset then
+                -- The preset's plate_text is whatever plate the car wore when
+                -- it was saved (usually random). The vanity plate wins.
+                if vanity then preset.plate_text = vanity end
                 -- 9. Apply customization
                 TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
             end
         end
 
-        -- 9b. Personal vanity plate, AFTER the preset on purpose.
-        --
-        -- applyCustom sets plate_text from the saved preset, which is whatever
-        -- plate that car happened to wear when it was saved -- usually a random
-        -- game-generated one. The player's chosen plate has to land last or the
-        -- preset would keep overwriting it on every spawn.
-        --
-        -- Sent separately rather than folded into the preset so it still
-        -- applies to cars with no saved customization at all, which is most of
-        -- them for most players.
-        local pOk, plate = pcall(function()
-            return exports["spz-identity"]:GetPlate(src)
-        end)
-        if pOk and plate and plate ~= "" then
-            TriggerClientEvent("SPZ:vehicle:applyPlate", src, active.netId, plate)
+    end
+
+    -- 9b. Personal vanity plate — on every car the player drives, rentals
+    -- included (it is the player's plate, not the car's).
+    --
+    -- Set on the entity server-side: the server created and owns this car, so
+    -- this is authoritative and syncs to every client. The client event is a
+    -- fallback for the window before the entity is synced.
+    if vanity then
+        if DoesEntityExist(active.entity) then
+            SetVehicleNumberPlateText(active.entity, vanity)
         end
+        TriggerClientEvent("SPZ:vehicle:applyPlate", src, active.netId, vanity)
     end
 
     -- 10. Place player in seat

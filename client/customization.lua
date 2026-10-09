@@ -37,14 +37,33 @@ function SPZ.CaptureVisuals(vehicle)
   }
 end
 
+--- Wait for a networked car to reach this client and take control of it.
+--- The net id has to be resolved again on every tick: NetToVeh returns 0
+--- until the entity has streamed in, and the old loops resolved it once and
+--- then waited on that 0 forever, so the plate / preset was silently skipped.
+local function awaitVehicle(netId, ms)
+  local deadline = GetGameTimer() + (ms or 5000)
+  local vehicle = 0
+  while GetGameTimer() < deadline do
+    if NetworkDoesEntityExistWithNetworkId(netId) then
+      vehicle = NetToVeh(netId)
+      if vehicle ~= 0 and DoesEntityExist(vehicle) then break end
+    end
+    Wait(50)
+  end
+  if vehicle == 0 or not DoesEntityExist(vehicle) then return 0 end
+  local ctl = GetGameTimer() + 1500
+  while not NetworkHasControlOfEntity(vehicle) and GetGameTimer() < ctl do
+    NetworkRequestControlOfEntity(vehicle); Wait(0)
+  end
+  return vehicle
+end
+
 RegisterNetEvent("SPZ:vehicle:applyCustom", function(netId, preset)
   if not preset then return end  -- no saved preset, keep defaults
 
-  local vehicle = NetToVeh(netId)
-  local timeout = 50
-  while not DoesEntityExist(vehicle) and timeout > 0 do Wait(50); timeout = timeout - 1 end
-
-  if not DoesEntityExist(vehicle) then return end
+  local vehicle = awaitVehicle(netId)
+  if vehicle == 0 then return end
 
   SetVehicleModKit(vehicle, 0)
 
@@ -64,7 +83,11 @@ RegisterNetEvent("SPZ:vehicle:applyCustom", function(netId, preset)
     SetVehicleLivery(vehicle, preset.livery)
   end
 
-  SetVehicleNumberPlateText(vehicle, preset.plate_text)
+  -- The server swaps in the player's vanity plate before sending, so this
+  -- never puts the old random plate back over it.
+  if preset.plate_text and preset.plate_text ~= "" then
+    SetVehicleNumberPlateText(vehicle, preset.plate_text)
+  end
   SetVehicleNumberPlateTextIndex(vehicle, preset.plate_style)
   SetVehicleWindowTint(vehicle, preset.window_tint)
 
@@ -89,10 +112,7 @@ end)
 RegisterNetEvent("SPZ:vehicle:applyPlate", function(netId, plate)
   if not plate or plate == "" then return end
 
-  local vehicle = NetToVeh(netId)
-  local timeout = 50
-  while not DoesEntityExist(vehicle) and timeout > 0 do Wait(50); timeout = timeout - 1 end
-  if not DoesEntityExist(vehicle) then return end
-
+  local vehicle = awaitVehicle(netId)
+  if vehicle == 0 then return end
   SetVehicleNumberPlateText(vehicle, plate)
 end)
