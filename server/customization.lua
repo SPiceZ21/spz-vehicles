@@ -2,7 +2,7 @@
 SPZ = SPZ or {}
 
 SPZ.Notify = function(src, msg, ntype, time)
-    TriggerClientEvent('ox_lib:notify', src, { description = msg, type = ntype, duration = time, position = "center-left" })
+    TriggerClientEvent('ox_lib:notify', src, { description = msg, type = ntype, duration = time })
 end
 
 RegisterNetEvent("SPZ:vehicle:saveCustom", function(modelHash, preset, clientName)
