@@ -241,6 +241,14 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
         if pOk and type(plate) == "string" and plate ~= "" then vanity = plate end
     end
 
+    -- 7b. Race cars wear a random base-game chameleon paint (161-222, build
+    -- 2944+) over the whole body. Set on the entity now, and folded into the
+    -- saved preset below so the player's own paint doesn't override it.
+    local chameleon = active.type == "race" and math.random(161, 222) or nil
+    if chameleon and DoesEntityExist(active.entity) then
+        SetVehicleColours(active.entity, chameleon, chameleon)
+    end
+
     -- 8. Load customization (skip for rentals)
     if not active.isRental then
         local ok, profile = pcall(function()
@@ -255,6 +263,11 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
                 -- The preset's plate_text is whatever plate the car wore when
                 -- it was saved (usually random). The vanity plate wins.
                 if vanity then preset.plate_text = vanity end
+                if chameleon then
+                    preset.primary_color, preset.secondary_color = chameleon, chameleon
+                    preset.pearlescent = chameleon
+                    preset.custom_primary, preset.custom_secondary = nil, nil
+                end
                 -- 9. Apply customization
                 TriggerClientEvent("SPZ:vehicle:applyCustom", src, active.netId, preset)
             end
