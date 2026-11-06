@@ -1,0 +1,72 @@
+-- client/vehfunc/godmode.lua — vehicle godmode in freeroam.
+-- Moved from spz-vehfunc/client/godmode.lua when it was merged into spz-vehicles.
+
+-- client/godmode.lua
+-- Vehicles take no damage. Applied to EVERY vehicle in scope (yours, parked,
+-- other players', race, freeroam). Cars still bump/push physically — they just
+-- never break, deform, catch fire, or lose performance.
+--
+-- Everything is re-applied on a short tick, not once, because several things
+-- reset these flags: the race grid-unfreeze (SPZ:freezeRacer at GO sets
+-- invincible=false), vehicle re-streaming, and network-owner changes. Cheap
+-- enough at 250 ms.
+
+local GODMODE = true   -- set false to let vehicles take damage
+if Config and Config.VehicleGodmode == false then GODMODE = false end
+
+local function protect(veh)
+    -- damage gate (most reliable — survives owner changes)
+    SetEntityCanBeDamaged(veh, false)
+    SetEntityInvincible(veh, true)
+    SetEntityProofs(veh, true, true, true, true, true, true, true, true)
+
+    -- component breakage
+    SetVehicleTyresCanBurst(veh, false)
+    SetVehicleWheelsCanBreak(veh, false)
+    SetVehicleCanBeVisiblyDamaged(veh, false)
+    SetVehicleEngineCanDegrade(veh, false)
+    SetVehicleStrong(veh, true)
+
+    -- pin health so anything that slipped through is repaired instantly
+    SetVehicleBodyHealth(veh, 1000.0)
+    SetVehicleEngineHealth(veh, 1000.0)
+    SetVehiclePetrolTankHealth(veh, 1000.0)
+    SetVehicleDeformationFixed(veh)
+end
+
+-- Admin trolls (spz-admin: pop tyres, smoking engine, explode) need the
+-- target's own car to be breakable for a moment. They ask for a pause on the
+-- car we're driving; everything else stays protected, and it resumes itself.
+local pauseUntil = 0
+AddEventHandler("spz-admin:godmodePause", function(ms)
+    pauseUntil = math.max(pauseUntil, GetGameTimer() + (tonumber(ms) or 0))
+end)
+
+CreateThread(function()
+    while true do
+        -- Hot Pursuit needs real damage (a wrecked getaway car = busted), and
+        -- every player in the match bucket has inPursuit set, so nobody there
+        -- re-protects the match cars.
+        -- inMinigame == "Hot Pursuit" is set locally by the pursuit client the
+        -- moment the match begins, so there is no window where the replicated
+        -- inPursuit hasn't landed yet and this re-protects (and re-heals) the car.
+        -- Any other minigame that wants real damage (Demolition derby) sets the
+        -- local `vehDamage` flag for the round instead of being named here.
+        local st = LocalPlayer.state
+        if GODMODE and not st.inPursuit and st.inMinigame ~= "Hot Pursuit" and st.vehDamage ~= true then
+            -- Protect EVERY vehicle in scope, not just the one we're driving —
+            -- so parked / exited / other players' cars never take visual or
+            -- engine damage either. The car we're in is refreshed most often.
+            local mine = GetVehiclePedIsIn(PlayerPedId(), false)
+            local paused = GetGameTimer() < pauseUntil
+            if mine ~= 0 and DoesEntityExist(mine) and not paused then protect(mine) end
+
+            for _, veh in ipairs(GetGamePool('CVehicle')) do
+                if veh ~= mine and DoesEntityExist(veh) then protect(veh) end
+            end
+            Wait(500)
+        else
+            Wait(1500)
+        end
+    end
+end)
