@@ -3,7 +3,7 @@ game 'gta5'
 
 name 'spz-vehicles'
 description 'SPiceZ-Core — Vehicles: registry, spawn, upgrades, customization, garage, tuner, vehicle functions'
-version '2.0.0'
+version '2.0.1'
 author 'SPiceZ-Core'
 
 shared_scripts {
