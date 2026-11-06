@@ -80,7 +80,6 @@ data_file 'CARMODCOLS_GEN9_FILE' 'data/carmodcols_gen9.meta'
 dependencies {
   'ox_lib',
   'spz-core',
-  'spz-identity',
   'spz-hud',        -- draws the garage and tuner pages
   'oxmysql',
 }

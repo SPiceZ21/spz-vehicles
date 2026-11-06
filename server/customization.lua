@@ -7,7 +7,7 @@ end
 
 RegisterNetEvent("SPZ:vehicle:saveCustom", function(modelHash, preset, clientName)
   local src     = source
-  local profile = exports["spz-identity"]:GetProfile(src)
+  local profile = exports["spz-core"]:GetProfile(src)
 
   if not profile then return end
 
@@ -58,7 +58,7 @@ end
 --- @param src number (Source)
 --- @param model string
 function ResetCustomization(src, model)
-    local profile = exports["spz-identity"]:GetProfile(src)
+    local profile = exports["spz-core"]:GetProfile(src)
     if not profile then return end
 
     exports.oxmysql:execute(

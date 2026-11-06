@@ -237,7 +237,7 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     -- into the preset below and set on the entity server-side.
     local vanity = nil
     do
-        local pOk, plate = pcall(function() return exports["spz-identity"]:GetPlate(src) end)
+        local pOk, plate = pcall(function() return exports["spz-core"]:GetPlate(src) end)
         if pOk and type(plate) == "string" and plate ~= "" then vanity = plate end
     end
 
@@ -252,7 +252,7 @@ RegisterNetEvent("SPZ:vehicle:upgradesApplied", function(netId)
     -- 8. Load customization (skip for rentals)
     if not active.isRental then
         local ok, profile = pcall(function()
-            return exports["spz-identity"]:GetProfile(src)
+            return exports["spz-core"]:GetProfile(src)
         end)
         
         if ok and profile then
